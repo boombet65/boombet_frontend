@@ -1,0 +1,25 @@
+this file without backend 
+
+server {
+    listen 80;
+    listen [::]:80;
+
+    server_name 109.123.246.213;
+
+    root /var/www/boombet_frontend;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Vue static files caching
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+}
