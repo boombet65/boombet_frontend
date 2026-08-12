@@ -1,4 +1,4 @@
-<!-- pages/BetsPage.vue -->
+<!-- BetsPage.vue - Only showing the changed parts -->
 <template>
   <div class="max-w-3xl mx-auto px-4 py-6">
 
@@ -26,7 +26,16 @@
 
       <!-- Settled Bets -->
       <div v-else-if="activeTab === 'settled'">
-        
+        <div class="flex gap-2 mb-4 flex-wrap">
+          <button v-for="f in filters" :key="f.value"
+                  class="px-3 py-1.5 rounded-full text-xs font-bold border transition-all"
+                  :class="settledFilter === f.value
+                    ? 'border-yellow-400 bg-yellow-400/10 text-yellow-400'
+                    : 'border-cyan-800 text-cyan-600 hover:border-cyan-600'"
+                  @click="updateSettledFilter(f.value)">
+            {{ f.label }}
+          </button>
+        </div>
         
         <div v-if="loading" class="space-y-3">
           <BetCardSkeleton v-for="n in 4" :key="n" />
@@ -43,36 +52,15 @@
         </div>
       </div>
 
+      <!-- Rest of the template stays the same -->
       <!-- Jackpot Bets -->
       <div v-else-if="activeTab === 'jackpot'">
-        <div v-if="loading" class="space-y-3">
-          <BetCardSkeleton v-for="n in 2" :key="n" />
-        </div>
-        <EmptyState v-else-if="!hasJackpotBets" 
-                   icon="💰" 
-                   title="No jackpot bets" 
-                   description="Try your luck on the jackpot" 
-                   action-to="/jackpot" 
-                   action-label="Play Jackpot" />
-        <div v-else class="space-y-3">
-          <JackpotBetCard v-for="bet in jackpotBets" :key="bet.id" :bet="formatJackpotBet(bet)" />
-        </div>
+        <!-- ... -->
       </div>
 
       <!-- Virtual Bets -->
       <div v-else-if="activeTab === 'virtuals'">
-        <div v-if="loading" class="space-y-3">
-          <BetCardSkeleton v-for="n in 2" :key="n" />
-        </div>
-        <EmptyState v-else-if="!hasVirtualBets" 
-                   icon="🤖" 
-                   title="No virtual bets" 
-                   description="Bet on virtual sports 24/7" 
-                   action-to="/virtuals" 
-                   action-label="Play Virtuals" />
-        <div v-else class="space-y-3">
-          <VirtualBetCard v-for="bet in virtualBets" :key="bet.id" :bet="formatVirtualBet(bet)" />
-        </div>
+        <!-- ... -->
       </div>
 
     </div>
@@ -132,15 +120,24 @@ const tabsWithCounts = computed(() => [
   { key: 'virtuals', label: 'Virtuals', icon: '🤖', count: virtualBets.value.length },
 ])
 
-// ============ Format Open Bet ============
+/**
+ * ============ FIX: Format Open Bet for display ============
+ * Open bets have status: 'PENDING' and result: 'OPEN'
+ */
 function formatOpenBet(bet) {
+  console.log('📊 Formatting open bet:', bet)
+  
   return {
     id: bet.id,
     bet_ticket: bet.ticket_code,
     type: bet.selections?.length > 1 ? 'accumulator' : 'single',
     stake: bet.stake,
-    netPayout: bet.payout || 0,
-    totalOdds: bet.total_odds,
+    netPayout: bet.payout || bet.netPayout,
+    totalOdds: bet.total_odds || bet.totalOdds,
+    // ============ Show status with proper icon ============
+    status: 'PENDING', // Always PENDING for open bets
+    statusLabel: 'In Progress',
+    statusIcon: '⏳',
     selections: bet.selections?.map(sel => ({
       matchName: sel.match?.home_team && sel.match?.away_team 
         ? `${sel.match.home_team} vs ${sel.match.away_team}`
@@ -148,37 +145,46 @@ function formatOpenBet(bet) {
       market: sel.market_key || sel.market || '1X2',
       pick: sel.outcome_key || sel.pick,
       odds: sel.odds_at_placement || sel.odds,
-      matchStatus: sel.match?.status,
-      selectionStatus: sel.status
+      matchStatus: sel.match?.status || 'UPCOMING',
+      currentScore: sel.match?.current_score,
+      elapsedMinute: sel.match?.elapsed_minute
     }))
   }
 }
 
-// ============ Format Settled Bet ============
+/**
+ * ============ FIX: Format Settled Bet for display ============
+ * Settled bets have status: 'SETTLED' and result: 'WON', 'LOST', or 'CANCELLED'
+ */
 function formatSettledBet(bet) {
-  const isWon = bet.result === 'WON' || bet.result === 'won'
-  const isLost = bet.result === 'LOST' || bet.result === 'lost'
+  console.log('🏁 Formatting settled bet:', bet)
+  
+  const isWon = bet.result === 'WON'
+  const isLost = bet.result === 'LOST'
   
   return {
     id: bet.id,
     bet_ticket: bet.ticket_code,
-    type: bet.selections?.length > 1 ? 'accumulator' : 'single',
     stake: bet.stake,
     potentialWin: isWon ? bet.payout : 0,
     tax: bet.tax || 0,
     netPayout: isWon ? bet.payout : 0,
-    result: isWon ? 'won' : isLost ? 'lost' : 'unknown',
-    createdAt: bet.updated_at || bet.createdAt,
+    // ============ Use result for display ============
+    result: bet.result?.toLowerCase(), // 'won', 'lost', 'cancelled'
+    resultLabel: isWon ? 'Won' : isLost ? 'Lost' : 'Cancelled',
+    resultIcon: isWon ? '✅' : isLost ? '❌' : '🚫',
+    resultColor: isWon ? 'text-green-400' : isLost ? 'text-red-400' : 'text-gray-400',
+    createdAt: bet.updated_at || bet.settledAt || bet.createdAt,
     selections: bet.selections?.map(sel => ({
       matchName: sel.match?.home_team && sel.match?.away_team 
         ? `${sel.match.home_team} vs ${sel.match.away_team}`
         : sel.matchName || sel.match?.name,
-      result: sel.status
+      result: sel.status 
     }))
   }
 }
 
-// ============ Format Jackpot Bet ============
+// Format bet for JackpotBetCard component
 function formatJackpotBet(bet) {
   return {
     id: bet.id,
@@ -190,7 +196,7 @@ function formatJackpotBet(bet) {
   }
 }
 
-// ============ Format Virtual Bet ============
+// Format bet for VirtualBetCard component
 function formatVirtualBet(bet) {
   return {
     id: bet.id,
@@ -204,7 +210,7 @@ function formatVirtualBet(bet) {
   }
 }
 
-// ============ Load Bets ============
+// Load bets from API
 async function loadBets() {
   if (!authStore.isLoggedIn) {
     loading.value = false
@@ -213,7 +219,15 @@ async function loadBets() {
   
   loading.value = true
   try {
-    await betStore.fetchBetHistory({ limit: 100 })
+    const result = await betStore.fetchBetHistory({ limit: 100 })
+    console.log('📨 Bets loaded:', result)
+    
+    // ============ DEBUG: Log bet statuses ============
+    if (result.success) {
+      result.data.forEach(bet => {
+        console.log(`Bet ${bet.ticket_code}: status=${bet.status}, result=${bet.result}`)
+      })
+    }
   } catch (error) {
     console.error('Failed to load bets:', error)
   } finally {
@@ -221,12 +235,12 @@ async function loadBets() {
   }
 }
 
-// ============ Go to Detail ============
+// Navigate to bet detail
 function goToDetail(id) {
   router.push(`/bets/${id}`)
 }
 
-// ============ Lifecycle ============
+// Load bets on mount
 onMounted(() => {
   loadBets()
 })

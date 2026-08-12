@@ -13,7 +13,6 @@
         </div>
         <div class="flex items-center gap-2">
           <span class="text-[12px] text-cyan-500 font-bold">{{ match.time }}</span>
-          <!-- <span class="text-[11px] text-cyan-600">{{ formattedDate }}</span> -->
         </div>
       </div>
 
