@@ -12,17 +12,11 @@
           </span>
         </div>
         <div class="flex items-center gap-2">
-          <!-- ✅ ONYESHA DAKIKA KUTOKA EVENTS -->
-          <span 
-            class="text-[12px] font-bold" 
-            :class="isLive ? 'text-red-400 animate-pulse' : 'text-cyan-500'"
-          >
-            {{ displayTime }}
-          </span>
+          <span class="text-[12px] text-cyan-500 font-bold">{{ match.time }}</span>
         </div>
       </div>
 
-      <!-- Teams (remain same) -->
+      <!-- Teams -->
       <div class="grid grid-cols-3 items-center gap-3 mb-1">
         <div class="text-left">
           <p class="text-sm font-bold text-cyan-100 truncate">{{ homeTeamName }}</p>
@@ -40,7 +34,7 @@
       </div>
     </div>
 
-    <!-- Odds Row (remain same) -->
+    <!-- Odds Row -->
     <div class="flex gap-2 mt-1" v-if="formatted1X2Odds.length">
       <OddCard
         v-for="odd in formatted1X2Odds" 
@@ -56,7 +50,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import OddCard from './OddsCard.vue'
 import { useBetStore } from '../../stores/bet/betStore.js'
@@ -65,47 +59,26 @@ const router = useRouter()
 const betStore = useBetStore()
 const props = defineProps({ match: { type: Object, required: true } })
 
-// ✅ REF kwa ajili ya kuonyesha muda
-const displayTime = ref(props.match.time || '')
-
-// ✅ FUNCTION KUPATA DAKIKA KUTOKA EVENTS
-const getCurrentMinuteFromEvents = (matchData) => {
-  if (!matchData?.predetermined_script?.events_timeline) return null
+// ============ FORMAT DATE ============
+const formattedDate = computed(() => {
+  const dateString = props.match.date
+  if (!dateString) return ''
   
-  const events = matchData.predetermined_script.events_timeline
+  const date = new Date(dateString)
+  if (isNaN(date.getTime())) return dateString
   
-  // Kama match iko LIVE, chukua event ya mwisho
-  if (matchData.status === 'LIVE' || matchData.live) {
-    // Tafuta event ya mwisho iliyorekodiwa
-    const lastEvent = events[events.length - 1]
-    if (lastEvent && lastEvent.minute !== undefined) {
-      return lastEvent.minute
-    }
-  }
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dayName = days[date.getDay()]
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
   
-  return null
-}
-
-// ✅ FUNCTION YA KU-UPDATE DISPLAY TIME
-const updateDisplayTime = (matchData) => {
-  if (!matchData) return
+  // LOG DATE
+  console.log('📅 Original Date:', dateString)
+  console.log('📅 Formatted Date:', `${dayName} ${day}/${month}`)
   
-  // Kama ni LIVE
-  if (matchData.status === 'LIVE' || matchData.live) {
-    const currentMinute = getCurrentMinuteFromEvents(matchData)
-    displayTime.value = currentMinute ? `${currentMinute}'` : 'LIVE'
-  } else {
-    // Kwa upcoming, tumia time iliyopo
-    displayTime.value = matchData.time || ''
-  }
-}
-
-// ✅ Watch kwa mabadiliko ya match (kutoka socket updates)
-watch(() => props.match, (newMatch) => {
-  if (newMatch) {
-    updateDisplayTime(newMatch)
-  }
-}, { deep: true })
+  return `${dayName} ${day}/${month}`
+})
+// =====================================
 
 // Getters
 const homeTeamName = computed(() => props.match.home_team || props.match.homeTeam)
@@ -113,7 +86,7 @@ const awayTeamName = computed(() => props.match.away_team || props.match.awayTea
 const isLive = computed(() => props.match.status === 'LIVE' || props.match.live || false)
 const currentScore = computed(() => props.match.current_score || props.match.score || { home: 0, away: 0 })
 
-// Format 1X2 Odds (remain same)
+// Format 1X2 Odds
 const formatted1X2Odds = computed(() => {
   if (!props.match?.odds) return []
 
@@ -154,9 +127,4 @@ function goToDetail() {
     params: { id: props.match.id }
   })
 }
-
-// ✅ Initialize display time on mount
-onMounted(() => {
-  updateDisplayTime(props.match)
-})
 </script>

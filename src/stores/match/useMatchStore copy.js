@@ -26,10 +26,8 @@ export const useMatchStore = defineStore('match', {
         ])
 
         this.upcomingMatches = upcomingRes.data.data || []
+            // console.log('📈 Upcoming Matches:', this.upcomingMatches)
         this.liveMatches = liveRes.data.data || []
-        
-        console.log('📈 Upcoming Matches:', this.upcomingMatches.length)
-        console.log('📡 Live Matches:', this.liveMatches.length)
       } catch (err) {
         this.error = err.response?.data?.message || 'Imeshindikana kuleta mechi'
         console.error('[MATCH STORE ERROR]:', err)
@@ -77,7 +75,8 @@ export const useMatchStore = defineStore('match', {
       }
     },
 
-    // --- CREATE BULK ---
+
+        // --- CREATE BULK ---
     async createMultipleMatches(matchesData) {
       this.actionLoading = true
       this.error = null
@@ -102,7 +101,7 @@ export const useMatchStore = defineStore('match', {
       }
     },
 
-    // --- UPLOAD FILE ---
+        // --- UPLOAD FILE ---
     async uploadMatchesFile(file) {
       this.actionLoading = true
       this.error = null
@@ -173,81 +172,30 @@ export const useMatchStore = defineStore('match', {
         autoConnect: true
       })
 
-      // ✅ LISTENER KWA MATCH SCORE UPDATE
       this.socket.on('match_score_update', ({ match_id, current_score, elapsed_minute }) => {
-        console.log('⚡ Score Update:', match_id, current_score)
-        
         const liveMatch = this.liveMatches.find(m => m.id === match_id)
         if (liveMatch) {
           liveMatch.current_score = current_score
-          // Ikiwa backend inatuma elapsed_minute, ihifadhi
-          if (elapsed_minute !== undefined) {
-            liveMatch.elapsed_minute = elapsed_minute
-          }
+          liveMatch.elapsed_minute = elapsed_minute
         } else {
           const upcomingIndex = this.upcomingMatches.findIndex(m => m.id === match_id)
           if (upcomingIndex !== -1) {
             const [movedMatch] = this.upcomingMatches.splice(upcomingIndex, 1)
             movedMatch.status = 'LIVE'
             movedMatch.current_score = current_score
-            if (elapsed_minute !== undefined) {
-              movedMatch.elapsed_minute = elapsed_minute
-            }
+            movedMatch.elapsed_minute = elapsed_minute
             this.liveMatches.push(movedMatch)
-            console.log('🔄 Match moved to LIVE:', movedMatch.home_team, 'vs', movedMatch.away_team)
           }
         }
 
         if (this.selectedMatch && this.selectedMatch.id === match_id) {
           this.selectedMatch.status = 'LIVE'
           this.selectedMatch.current_score = current_score
-          if (elapsed_minute !== undefined) {
-            this.selectedMatch.elapsed_minute = elapsed_minute
-          }
+          this.selectedMatch.elapsed_minute = elapsed_minute
         }
       })
 
-      // ✅ LISTENER KWA MATCH EVENT UPDATE (KUTOKA PREDETERMINED SCRIPT)
-      this.socket.on('match_event_update', ({ match_id, event_index, current_event }) => {
-        console.log('📅 Event Update:', match_id, 'Event Index:', event_index)
-        
-        const liveMatch = this.liveMatches.find(m => m.id === match_id)
-        if (liveMatch && liveMatch.predetermined_script?.events_timeline) {
-          const events = liveMatch.predetermined_script.events_timeline
-          
-          // Kama event_index imetumwa, tumia hiyo
-          if (event_index !== undefined && event_index < events.length) {
-            const event = events[event_index]
-            // Update current_score ikiwa event ina current_score
-            if (event.current_score) {
-              liveMatch.current_score = event.current_score
-            }
-            // Update status ikiwa ni HALF_TIME au FULL_TIME
-            if (event.type === 'HALF_TIME') {
-              liveMatch.status = 'HALF_TIME'
-            } else if (event.type === 'FULL_TIME') {
-              liveMatch.status = 'FINISHED'
-              // Ongeza kwenye finished matches au remove from live
-              this.liveMatches = this.liveMatches.filter(m => m.id !== match_id)
-            }
-          } 
-          // Kama current_event imetumwa, tumia hiyo
-          else if (current_event && current_event.minute !== undefined) {
-            // Update current_score ikiwa ipo
-            if (current_event.current_score) {
-              liveMatch.current_score = current_event.current_score
-            }
-          }
-          
-          // Trigger reactivity update
-          liveMatch._updated = Date.now()
-        }
-      })
-
-      // ✅ LISTENER KWA MATCH FINISHED
       this.socket.on('match_finished', ({ match_id, final_score }) => {
-        console.log('🏁 Match Finished:', match_id, final_score)
-        
         this.liveMatches = this.liveMatches.filter(m => m.id !== match_id)
 
         if (this.selectedMatch && this.selectedMatch.id === match_id) {
@@ -258,85 +206,13 @@ export const useMatchStore = defineStore('match', {
           }
         }
       })
-
-      // ✅ LISTENER KWA MATCH STATUS CHANGE
-      this.socket.on('match_status_change', ({ match_id, status, match_data }) => {
-        console.log('🔄 Status Change:', match_id, status)
-        
-        if (status === 'LIVE') {
-          // Tafuta kwenye upcoming na uhamishe kwenye live
-          const upcomingIndex = this.upcomingMatches.findIndex(m => m.id === match_id)
-          if (upcomingIndex !== -1) {
-            const [movedMatch] = this.upcomingMatches.splice(upcomingIndex, 1)
-            movedMatch.status = 'LIVE'
-            if (match_data) {
-              Object.assign(movedMatch, match_data)
-            }
-            this.liveMatches.push(movedMatch)
-          }
-        } else if (status === 'FINISHED') {
-          // Ondoa kwenye live
-          this.liveMatches = this.liveMatches.filter(m => m.id !== match_id)
-        }
-      })
-
-      console.log('🔌 Socket initialized and listening')
     },
 
     disconnectSocket() {
       if (this.socket) {
         this.socket.disconnect()
         this.socket = null
-        console.log('🔌 Socket disconnected')
       }
-    },
-
-    // ✅ HELPER KUPATA EVENT YA MWISHO KWA LIVE MATCH
-    getCurrentEvent(matchId) {
-      const match = this.liveMatches.find(m => m.id === matchId)
-      if (!match?.predetermined_script?.events_timeline) return null
-      
-      const events = match.predetermined_script.events_timeline
-      return events[events.length - 1] || null
-    },
-
-    // ✅ HELPER KUPATA DAKIKA YA SASA KWA LIVE MATCH
-    getCurrentMinute(matchId) {
-      const match = this.liveMatches.find(m => m.id === matchId)
-      if (!match?.predetermined_script?.events_timeline) return null
-      
-      const events = match.predetermined_script.events_timeline
-      const lastEvent = events[events.length - 1]
-      return lastEvent?.minute || null
-    },
-
-    // ✅ HELPER KUSASISHA EVENT KWA MATCH (INAWEZA KUITWA KUTOKA ADMIN)
-    advanceMatchEvent(matchId, eventIndex) {
-      const match = this.liveMatches.find(m => m.id === matchId)
-      if (!match?.predetermined_script?.events_timeline) return false
-      
-      const events = match.predetermined_script.events_timeline
-      if (eventIndex >= 0 && eventIndex < events.length) {
-        const event = events[eventIndex]
-        
-        // Update score ikiwa event ina current_score
-        if (event.current_score) {
-          match.current_score = event.current_score
-        }
-        
-        // Update status ikiwa ni HALF_TIME au FULL_TIME
-        if (event.type === 'HALF_TIME') {
-          match.status = 'HALF_TIME'
-        } else if (event.type === 'FULL_TIME') {
-          match.status = 'FINISHED'
-          this.liveMatches = this.liveMatches.filter(m => m.id !== matchId)
-        }
-        
-        // Trigger reactivity
-        match._updated = Date.now()
-        return true
-      }
-      return false
     },
 
     // Helper ya ku-update mechi kwenye local array

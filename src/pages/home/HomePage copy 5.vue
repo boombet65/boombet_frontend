@@ -116,8 +116,6 @@ import { useMatchStore } from '../../stores/match/useMatchStore.js'
 const matchStore = useMatchStore()
 
 // Helper Function: Kubadilisha Muundo wa DB kwenda kwenye Muundo unaosomwa na MatchCard.vue
-// HomePage.vue - formatMatchForCard function
-
 const formatMatchForCard = (dbMatch) => {
   const odds1X2 = dbMatch.odds?.['1X2'] || {}
 
@@ -137,6 +135,7 @@ const formatMatchForCard = (dbMatch) => {
   const formatTimeWithAMPM = (timeStr) => {
     if (!timeStr) return ''
     
+    // Kama time ni "19:00" au "07:00"
     const [hours, minutes] = timeStr.split(':').map(Number)
     if (isNaN(hours) || isNaN(minutes)) return timeStr
     
@@ -145,31 +144,11 @@ const formatMatchForCard = (dbMatch) => {
     return `${String(hour12).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${ampm}`
   }
 
-  // ✅ FUNCTION KUPATA DAKIKA KUTOKA EVENTS
-  const getCurrentMinuteFromEvents = (match) => {
-    if (!match.predetermined_script?.events_timeline) return null
-    
-    // Pata events zote
-    const events = match.predetermined_script.events_timeline
-    
-    // Kama match iko LIVE, chukua event ya mwisho
-    if (match.status === 'LIVE') {
-      // Chuja events ambazo zimetokea (zisizo za future)
-      // Kwa kawaida tunachukua event ya mwisho iliyorekodiwa
-      const lastEvent = events[events.length - 1]
-      if (lastEvent && lastEvent.minute) {
-        return lastEvent.minute
-      }
-    }
-    
-    return null
-  }
-
-  // ✅ PATA DAKIKA KWA LIVE MATCH
+  // Kama ni LIVE - onyesha dakika
+  // Kama ni UPCOMING - onyesha date na time
   let displayTime = ''
   if (dbMatch.status === 'LIVE') {
-    const currentMinute = getCurrentMinuteFromEvents(dbMatch)
-    displayTime = currentMinute ? `${currentMinute}'` : 'LIVE'
+    displayTime = dbMatch.elapsed_minute ? `${dbMatch.elapsed_minute}'` : 'LIVE'
   } else {
     // Upcoming: changanya date na time
     const dateStr = formatDate(dbMatch.date)
@@ -177,22 +156,18 @@ const formatMatchForCard = (dbMatch) => {
     displayTime = dateStr ? `${timeStr} ${dateStr}` : timeStr
   }
 
-  // ✅ LOG kwa ajili ya debugging
   console.log('📅 Match:', dbMatch.home_team, 'vs', dbMatch.away_team)
   console.log('📅 Status:', dbMatch.status)
-  console.log('📅 Events Timeline:', dbMatch.predetermined_script?.events_timeline?.length || 0)
   console.log('📅 Display Time:', displayTime)
 
   return {
     id: dbMatch.id,
     league: dbMatch.league || 'General League',
-    time: displayTime,  // ← HAPA ITAONESHA DAKIKA KUTOKA EVENTS
+    time: displayTime,  // ← HAPA INAONYESHA "Sat 08/08 07:00 PM"
     homeTeam: dbMatch.home_team,
     date: dbMatch.date || '',
     awayTeam: dbMatch.away_team,
     live: dbMatch.status === 'LIVE',
-    status: dbMatch.status,
-    predetermined_script: dbMatch.predetermined_script, // ✅ PITISHA SCRIPT
     score: {
       home: dbMatch.current_score?.home ?? 0,
       away: dbMatch.current_score?.away ?? 0

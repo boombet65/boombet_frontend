@@ -1,3 +1,5 @@
+
+// src/pages/sports/LivePage.vue 
 <template>
   <div class="max-w-7xl mx-auto px-0 py-6">
 
@@ -43,15 +45,59 @@ const matchStore = useMatchStore()
 const formatMatchForCard = (dbMatch) => {
   const odds1X2 = dbMatch.odds?.['1X2'] || {}
 
+  // ✅ FUNCTION KUPATA DAKIKA KUTOKA EVENTS
+  const getCurrentMinuteFromEvents = (match) => {
+    if (!match?.predetermined_script?.events_timeline) return null
+    
+    const events = match.predetermined_script.events_timeline
+    
+    // Kama match iko LIVE, chukua event ya mwisho
+    if (match.status === 'LIVE') {
+      // Chukua event ya mwisho iliyorekodiwa
+      const lastEvent = events[events.length - 1]
+      if (lastEvent && lastEvent.minute !== undefined) {
+        return lastEvent.minute
+      }
+    }
+    
+    return null
+  }
+
+  // ✅ PATA DAKIKA KWA LIVE MATCH
+  let displayTime = ''
+  if (dbMatch.status === 'LIVE') {
+    // Jaribu kupata dakika kutoka events
+    const currentMinute = getCurrentMinuteFromEvents(dbMatch)
+    
+    // Kama hakuna events, tumia elapsed_minute ikiwa ipo
+    if (currentMinute !== null) {
+      displayTime = `${currentMinute}'`
+    } else if (dbMatch.elapsed_minute) {
+      displayTime = `${dbMatch.elapsed_minute}'`
+    } else {
+      displayTime = 'LIVE'
+    }
+  } else {
+    // Upcoming: onyesha time tu
+    displayTime = dbMatch.time || ''
+  }
+
+  // ✅ LOG kwa ajili ya debugging
+  console.log('📅 Live Match:', dbMatch.home_team, 'vs', dbMatch.away_team)
+  console.log('📅 Status:', dbMatch.status)
+  console.log('📅 Events Timeline:', dbMatch.predetermined_script?.events_timeline?.length || 0)
+  console.log('📅 Display Time:', displayTime)
+
   return {
     id: dbMatch.id,
     league: dbMatch.league || 'General League',
-    time: dbMatch.status === 'LIVE' 
-      ? (dbMatch.elapsed_minute ? `${dbMatch.elapsed_minute}'` : 'LIVE') 
-      : `${dbMatch.time || ''}`,
+    time: displayTime,  // ← HAPA ITAONESHA DAKIKA KUTOKA EVENTS
     homeTeam: dbMatch.home_team,
     awayTeam: dbMatch.away_team,
     live: dbMatch.status === 'LIVE',
+    status: dbMatch.status,
+    predetermined_script: dbMatch.predetermined_script, // ✅ PITISHA SCRIPT
+    elapsed_minute: dbMatch.elapsed_minute,
     score: {
       home: dbMatch.current_score?.home ?? 0,
       away: dbMatch.current_score?.away ?? 0

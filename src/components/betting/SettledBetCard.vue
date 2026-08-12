@@ -18,17 +18,7 @@
       </span>
     </div>
 
-    <!-- Selections Preview -->
-    <div class="space-y-1.5 mb-3">
-      <div v-for="(sel, idx) in bet.selections?.slice(0, 3)" :key="idx"
-           class="flex items-center justify-between text-xs">
-        <span class="text-cyan-400 truncate max-w-[60%]">{{ sel.matchName }}</span>
-        <span class="text-cyan-600 font-mono">{{ sel.result === 'WON' ? '✅' : '❌' }}</span>
-      </div>
-      <p v-if="(bet.selections?.length || 0) > 3" class="text-[11px] text-cyan-600">
-        +{{ bet.selections.length - 3 }} more
-      </p>
-    </div>
+   
 
     <div class="flex items-center justify-between pt-3 border-t border-cyan-800/40 text-xs">
       <div>
