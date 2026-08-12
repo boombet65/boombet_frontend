@@ -1,0 +1,1165 @@
+<template>
+  <div class="space-y-4 sm:space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold text-white">Fixtures Management</h1>
+        <p class="text-cyan-400 text-xs sm:text-sm">Create and manage sports fixtures for betting</p>
+      </div>
+      <div class="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
+        <button 
+          @click="openCreateModal" 
+          class="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-slate-900 rounded-xl font-bold hover:from-yellow-400 hover:to-yellow-500 transition-all shadow-lg shadow-yellow-500/20 text-sm sm:text-base"
+        >
+          <span class="flex items-center justify-center gap-1 sm:gap-2">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            <span class="hidden xs:inline">Create</span>
+            <span class="xs:hidden">New</span>
+          </span>
+        </button>
+        <button 
+          @click="openBulkModal" 
+          class="flex-1 sm:flex-none px-4 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:from-emerald-400 hover:to-emerald-500 transition-all shadow-lg shadow-emerald-500/20 text-sm sm:text-base"
+        >
+          <span class="flex items-center justify-center gap-1 sm:gap-2">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+            </svg>
+            <span class="hidden xs:inline">Bulk</span>
+            <span class="xs:hidden">Upload</span>
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Stats Summary -->
+    <div class="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4">
+      <div class="bg-slate-800/50 rounded-xl sm:rounded-2xl border border-cyan-800/30 p-3 sm:p-4">
+        <p class="text-cyan-400 text-[10px] sm:text-sm">Total</p>
+        <p class="text-lg sm:text-2xl font-bold text-white">{{ totalFixtures }}</p>
+      </div>
+      <div class="bg-slate-800/50 rounded-xl sm:rounded-2xl border border-cyan-800/30 p-3 sm:p-4">
+        <p class="text-cyan-400 text-[10px] sm:text-sm">Upcoming</p>
+        <p class="text-lg sm:text-2xl font-bold text-emerald-400">{{ upcomingCount }}</p>
+      </div>
+      <div class="bg-slate-800/50 rounded-xl sm:rounded-2xl border border-cyan-800/30 p-3 sm:p-4">
+        <p class="text-cyan-400 text-[10px] sm:text-sm">Live</p>
+        <p class="text-lg sm:text-2xl font-bold text-red-400">{{ liveCount }}</p>
+      </div>
+      <div class="bg-slate-800/50 rounded-xl sm:rounded-2xl border border-cyan-800/30 p-3 sm:p-4">
+        <p class="text-cyan-400 text-[10px] sm:text-sm">Finished</p>
+        <p class="text-lg sm:text-2xl font-bold text-slate-400">{{ finishedCount }}</p>
+      </div>
+      <div class="bg-slate-800/50 rounded-xl sm:rounded-2xl border border-cyan-800/30 p-3 sm:p-4 col-span-2 xs:col-span-3 sm:col-span-1">
+        <p class="text-cyan-400 text-[10px] sm:text-sm">Total Bets</p>
+        <p class="text-lg sm:text-2xl font-bold text-yellow-400">{{ totalBetsOnFixtures }}</p>
+      </div>
+    </div>
+
+    <!-- Loading State -->
+    <div v-if="matchStore.loading" class="flex justify-center py-8">
+      <div class="text-cyan-400 text-lg">Loading fixtures...</div>
+    </div>
+
+    <!-- Error State -->
+    <div v-if="matchStore.error" class="bg-red-500/10 border border-red-500/50 rounded-xl p-4 text-red-400 text-sm">
+      {{ matchStore.error }}
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="bg-slate-800/50 rounded-xl sm:rounded-2xl border border-cyan-800/30 p-3 sm:p-4">
+      <div class="flex flex-wrap gap-2 sm:gap-3">
+        <div class="flex-1 min-w-[140px] sm:min-w-[200px]">
+          <input 
+            v-model="searchQuery"
+            type="text" 
+            placeholder="Search fixtures..."
+            class="w-full px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm placeholder-cyan-700"
+            @input="handleSearch"
+          />
+        </div>
+        <select 
+          v-model="filterSport"
+          class="flex-1 min-w-[100px] sm:flex-none px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm"
+        >
+          <option value="">All Sports</option>
+          <option value="football">⚽ Football</option>
+          <option value="basketball">🏀 Basketball</option>
+          <option value="tennis">🎾 Tennis</option>
+          <option value="cricket">🏏 Cricket</option>
+          <option value="rugby">🏉 Rugby</option>
+        </select>
+        <select 
+          v-model="filterStatus"
+          class="flex-1 min-w-[100px] sm:flex-none px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm"
+        >
+          <option value="">All Status</option>
+          <option value="UPCOMING">🟢 Upcoming</option>
+          <option value="LIVE">🔴 Live</option>
+          <option value="FINISHED">⚪ Finished</option>
+          <option value="CANCELLED">❌ Cancelled</option>
+        </select>
+        <button @click="applyFilters" class="px-3 sm:px-5 py-1.5 sm:py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 text-xs sm:text-sm">
+          Apply
+        </button>
+        <button @click="resetFilters" class="px-3 sm:px-5 py-1.5 sm:py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 text-xs sm:text-sm">
+          Reset
+        </button>
+        <button @click="refreshFixtures" class="px-3 sm:px-5 py-1.5 sm:py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-500 text-xs sm:text-sm">
+          <span class="hidden xs:inline">Refresh</span>
+          <span class="xs:hidden">⟳</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Fixtures Table -->
+    <div class="bg-slate-800/50 rounded-xl sm:rounded-2xl border border-cyan-800/30 overflow-hidden">
+      <!-- Mobile Card View -->
+      <div class="block sm:hidden divide-y divide-cyan-800/30">
+        <div v-if="allMatches.length === 0 && !matchStore.loading" class="px-4 py-8 text-center text-cyan-400">
+          No fixtures found
+        </div>
+        <div v-for="fixture in allMatches" :key="fixture.id" class="p-4 hover:bg-slate-900/30">
+          <div class="flex justify-between items-start mb-2">
+            <div class="flex-1">
+              <div class="text-white font-bold text-sm">{{ fixture.home_team }}</div>
+              <div class="text-cyan-500 text-xs">vs</div>
+              <div class="text-white font-bold text-sm">{{ fixture.away_team }}</div>
+            </div>
+            <span class="px-2 py-1 rounded-full text-[10px] font-medium whitespace-nowrap"
+              :class="{
+                'bg-emerald-500/20 text-emerald-400': fixture.status === 'UPCOMING',
+                'bg-red-500/20 text-red-400': fixture.status === 'LIVE',
+                'bg-slate-500/20 text-slate-400': fixture.status === 'FINISHED',
+                'bg-red-500/20 text-red-400': fixture.status === 'CANCELLED'
+              }"
+            >
+              {{ getStatusIcon(fixture.status) }} {{ fixture.status }}
+            </span>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-1 text-xs text-cyan-400 mb-2">
+            <div>🏆 {{ fixture.league || 'N/A' }}</div>
+            <div>📅 {{ formatDate(fixture.date) }} {{ fixture.time }}</div>
+          </div>
+          
+          <div class="flex justify-between items-center">
+            <div class="flex gap-2 text-xs">
+              <span class="text-emerald-400">1: {{ fixture.odds?.['1X2']?.home || fixture.odds?.home || 'N/A' }}</span>
+              <span class="text-yellow-400">X: {{ fixture.odds?.['1X2']?.draw || fixture.odds?.draw || 'N/A' }}</span>
+              <span class="text-red-400">2: {{ fixture.odds?.['1X2']?.away || fixture.odds?.away || 'N/A' }}</span>
+            </div>
+            <div class="flex gap-1">
+              <button @click="editFixture(fixture)" class="p-1.5 text-yellow-400 hover:text-yellow-300" title="Edit">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+              </button>
+              <button @click="openUpdateOdds(fixture)" class="p-1.5 text-cyan-400 hover:text-cyan-300" title="Odds">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-6 3v-3m-3 3h12M5 17h4m6 0h4M5 7h4m6 0h4M5 10h4m6 0h4M5 14h4m6 0h4"></path>
+                </svg>
+              </button>
+              <button @click="toggleStatus(fixture)" class="p-1.5 text-emerald-400 hover:text-emerald-300" title="Status">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+              </button>
+              <button @click="openDeleteModal(fixture)" class="p-1.5 text-red-400 hover:text-red-300" title="Delete">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Desktop Table View -->
+      <div class="hidden sm:block overflow-x-auto">
+        <table class="w-full min-w-[800px]">
+          <thead class="bg-slate-900/50">
+            <tr>
+              <th class="text-left px-4 py-3 text-cyan-400 text-xs font-medium">ID</th>
+              <th class="text-left px-4 py-3 text-cyan-400 text-xs font-medium">Teams</th>
+              <th class="text-left px-4 py-3 text-cyan-400 text-xs font-medium">League</th>
+              <th class="text-left px-4 py-3 text-cyan-400 text-xs font-medium">Date & Time</th>
+              <th class="text-left px-4 py-3 text-cyan-400 text-xs font-medium">Status</th>
+              <th class="text-left px-4 py-3 text-cyan-400 text-xs font-medium">Odds</th>
+              <th class="text-left px-4 py-3 text-cyan-400 text-xs font-medium">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="allMatches.length === 0 && !matchStore.loading">
+              <td colspan="7" class="px-4 py-8 text-center text-cyan-400">No fixtures found</td>
+            </tr>
+            <tr v-for="fixture in allMatches" :key="fixture.id" class="border-t border-cyan-800/30 hover:bg-slate-900/30">
+              <td class="px-4 py-3 text-white text-xs font-mono">{{ fixture.id?.slice(0, 6) }}...</td>
+              <td class="px-4 py-3">
+                <div class="text-white text-sm font-bold">{{ fixture.home_team }}</div>
+                <div class="text-cyan-500 text-[10px]">vs</div>
+                <div class="text-white text-sm font-bold">{{ fixture.away_team }}</div>
+              </td>
+              <td class="px-4 py-3 text-cyan-300 text-xs">{{ fixture.league || 'N/A' }}</td>
+              <td class="px-4 py-3 text-cyan-300 text-xs">
+                <div>{{ formatDate(fixture.date) }}</div>
+                <div class="text-cyan-500 text-[10px]">{{ fixture.time }}</div>
+              </td>
+              <td class="px-4 py-3">
+                <span class="px-2 py-1 rounded-full text-[10px] font-medium"
+                  :class="{
+                    'bg-emerald-500/20 text-emerald-400': fixture.status === 'UPCOMING',
+                    'bg-red-500/20 text-red-400': fixture.status === 'LIVE',
+                    'bg-slate-500/20 text-slate-400': fixture.status === 'FINISHED',
+                    'bg-red-500/20 text-red-400': fixture.status === 'CANCELLED'
+                  }"
+                >
+                  {{ getStatusIcon(fixture.status) }} {{ fixture.status || 'UNKNOWN' }}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="space-y-0.5 text-xs">
+                  <div class="text-emerald-400">1: {{ fixture.odds?.['1X2']?.home || fixture.odds?.home || 'N/A' }}</div>
+                  <div class="text-yellow-400">X: {{ fixture.odds?.['1X2']?.draw || fixture.odds?.draw || 'N/A' }}</div>
+                  <div class="text-red-400">2: {{ fixture.odds?.['1X2']?.away || fixture.odds?.away || 'N/A' }}</div>
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex gap-1">
+                  <button @click="editFixture(fixture)" class="p-1 text-yellow-400 hover:text-yellow-300" title="Edit">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                  </button>
+                  <button @click="openUpdateOdds(fixture)" class="p-1 text-cyan-400 hover:text-cyan-300" title="Update Odds">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-6 3v-3m-3 3h12M5 17h4m6 0h4M5 7h4m6 0h4M5 10h4m6 0h4M5 14h4m6 0h4"></path>
+                    </svg>
+                  </button>
+                  <button @click="toggleStatus(fixture)" class="p-1 text-emerald-400 hover:text-emerald-300" title="Toggle Status">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                  </button>
+                  <button @click="openDeleteModal(fixture)" class="p-1 text-red-400 hover:text-red-300" title="Delete">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                    </svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CREATE/EDIT MODAL -->
+    <div v-if="showCreateModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" @click.self="closeModal">
+      <div class="bg-slate-800 rounded-2xl border border-cyan-700 p-4 sm:p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg sm:text-xl font-bold text-white mb-4">
+          {{ isEditing ? 'Edit Fixture' : 'Create New Fixture' }}
+        </h3>
+        
+        <form @submit.prevent="saveFixture" class="space-y-4">
+          <!-- Teams -->
+          <div class="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label class="text-cyan-400 text-xs sm:text-sm block mb-1.5">Home Team *</label>
+              <input 
+                v-model="fixtureForm.home_team"
+                type="text"
+                required
+                placeholder="e.g. Man United"
+                class="w-full px-3 sm:px-4 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 placeholder-cyan-700 text-sm"
+              />
+            </div>
+            <div>
+              <label class="text-cyan-400 text-xs sm:text-sm block mb-1.5">Away Team *</label>
+              <input 
+                v-model="fixtureForm.away_team"
+                type="text"
+                required
+                placeholder="e.g. Liverpool"
+                class="w-full px-3 sm:px-4 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 placeholder-cyan-700 text-sm"
+              />
+            </div>
+          </div>
+
+          <!-- League -->
+          <div>
+            <label class="text-cyan-400 text-xs sm:text-sm block mb-1.5">League / Tournament</label>
+            <input 
+              v-model="fixtureForm.league"
+              type="text"
+              placeholder="e.g. Premier League"
+              class="w-full px-3 sm:px-4 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 placeholder-cyan-700 text-sm"
+            />
+          </div>
+
+          <!-- Date & Time -->
+          <div class="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
+            <div>
+              <label class="text-cyan-400 text-xs sm:text-sm block mb-1.5">Date *</label>
+              <input 
+                v-model="fixtureForm.date"
+                type="date"
+                required
+                class="w-full px-3 sm:px-4 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+              />
+            </div>
+            <div>
+              <label class="text-cyan-400 text-xs sm:text-sm block mb-1.5">Time *</label>
+              <input 
+                v-model="fixtureForm.time"
+                type="time"
+                required
+                class="w-full px-3 sm:px-4 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+              />
+            </div>
+          </div>
+
+          <!-- Odds -->
+          <div>
+            <label class="text-cyan-400 text-xs sm:text-sm block mb-1.5">Odds (1X2)</label>
+            <div class="grid grid-cols-3 gap-2 sm:gap-4">
+              <div>
+                <label class="text-emerald-400 text-[10px] sm:text-xs block mb-0.5">Home (1)</label>
+                <input 
+                  v-model.number="fixtureForm.odds_home"
+                  type="number"
+                  step="0.01"
+                  placeholder="1.95"
+                  class="w-full px-2 sm:px-3 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+                />
+              </div>
+              <div>
+                <label class="text-yellow-400 text-[10px] sm:text-xs block mb-0.5">Draw (X)</label>
+                <input 
+                  v-model.number="fixtureForm.odds_draw"
+                  type="number"
+                  step="0.01"
+                  placeholder="3.20"
+                  class="w-full px-2 sm:px-3 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+                />
+              </div>
+              <div>
+                <label class="text-red-400 text-[10px] sm:text-xs block mb-0.5">Away (2)</label>
+                <input 
+                  v-model.number="fixtureForm.odds_away"
+                  type="number"
+                  step="0.01"
+                  placeholder="4.50"
+                  class="w-full px-2 sm:px-3 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Status -->
+          <div>
+            <label class="text-cyan-400 text-xs sm:text-sm block mb-1.5">Status</label>
+            <select 
+              v-model="fixtureForm.status"
+              class="w-full px-3 sm:px-4 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+            >
+              <option value="UPCOMING">🟢 Upcoming</option>
+              <option value="LIVE">🔴 Live</option>
+              <option value="FINISHED">⚪ Finished</option>
+              <option value="CANCELLED">❌ Cancelled</option>
+            </select>
+          </div>
+
+          <!-- Buttons -->
+          <div class="flex flex-col xs:flex-row gap-2 sm:gap-3 pt-4">
+            <button 
+              type="submit" 
+              class="flex-1 py-2.5 sm:py-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-slate-900 rounded-xl font-bold hover:from-yellow-400 hover:to-yellow-500 text-sm sm:text-base"
+              :disabled="matchStore.actionLoading"
+            >
+              {{ matchStore.actionLoading ? 'Saving...' : 'Save Fixture' }}
+            </button>
+            <button 
+              type="button"
+              @click="closeModal" 
+              class="flex-1 py-2.5 sm:py-3 bg-slate-700 text-cyan-400 rounded-xl font-bold hover:bg-slate-600 text-sm sm:text-base"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- BULK UPLOAD MODAL -->
+    <div v-if="showBulkModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" @click.self="closeBulkModal">
+      <div class="bg-slate-800 rounded-2xl border border-emerald-700 p-4 sm:p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <h3 class="text-lg sm:text-xl font-bold text-white mb-2">Bulk Upload Fixtures</h3>
+        <p class="text-cyan-400 text-xs sm:text-sm mb-4 sm:mb-6">Add multiple fixtures at once using form or CSV/Excel file</p>
+
+        <!-- Tab Selection -->
+        <div class="flex gap-1 sm:gap-2 mb-4 sm:mb-6 bg-slate-900 rounded-xl p-1">
+          <button 
+            @click="bulkTab = 'form'"
+            class="flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-lg font-medium transition-all text-xs sm:text-sm"
+            :class="bulkTab === 'form' ? 'bg-emerald-500 text-slate-900' : 'text-cyan-400 hover:text-white'"
+          >
+            📝 Form
+          </button>
+          <button 
+            @click="bulkTab = 'file'"
+            class="flex-1 py-1.5 sm:py-2 px-2 sm:px-4 rounded-lg font-medium transition-all text-xs sm:text-sm"
+            :class="bulkTab === 'file' ? 'bg-emerald-500 text-slate-900' : 'text-cyan-400 hover:text-white'"
+          >
+            📁 File
+          </button>
+        </div>
+
+        <!-- TAB 1: FORM INPUT -->
+        <div v-if="bulkTab === 'form'">
+          <div class="mb-4">
+            <label class="text-cyan-400 text-xs sm:text-sm block mb-1.5">Number of matches to add</label>
+            <div class="flex flex-wrap gap-2 sm:gap-3">
+              <input 
+                v-model.number="bulkForm.numberOfMatches"
+                type="number"
+                min="1"
+                max="20"
+                class="w-20 sm:w-32 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+              />
+              <button 
+                @click="generateBulkForm"
+                class="px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-500 text-slate-900 rounded-lg font-bold hover:bg-emerald-400 text-sm"
+              >
+                Generate
+              </button>
+            </div>
+          </div>
+
+          <div v-if="bulkForm.matches.length > 0" class="space-y-3 sm:space-y-4 max-h-[400px] overflow-y-auto pr-1 sm:pr-2">
+            <div 
+              v-for="(match, index) in bulkForm.matches" 
+              :key="index"
+              class="bg-slate-900/50 rounded-xl border border-cyan-800/30 p-3 sm:p-4"
+            >
+              <div class="flex justify-between items-center mb-2 sm:mb-3">
+                <span class="text-cyan-400 text-xs sm:text-sm font-bold">Match #{{ index + 1 }}</span>
+                <button 
+                  @click="removeBulkMatch(index)"
+                  class="text-red-400 hover:text-red-300 text-xs sm:text-sm"
+                >
+                  ✕ Remove
+                </button>
+              </div>
+
+              <div class="grid grid-cols-2 gap-2 sm:gap-3">
+                <div>
+                  <label class="text-cyan-400 text-[10px] sm:text-xs block mb-0.5">Home Team</label>
+                  <input 
+                    v-model="match.home_team"
+                    type="text"
+                    placeholder="Home"
+                    class="w-full px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm placeholder-cyan-700"
+                  />
+                </div>
+                <div>
+                  <label class="text-cyan-400 text-[10px] sm:text-xs block mb-0.5">Away Team</label>
+                  <input 
+                    v-model="match.away_team"
+                    type="text"
+                    placeholder="Away"
+                    class="w-full px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm placeholder-cyan-700"
+                  />
+                </div>
+                <div>
+                  <label class="text-cyan-400 text-[10px] sm:text-xs block mb-0.5">League</label>
+                  <input 
+                    v-model="match.league"
+                    type="text"
+                    placeholder="League"
+                    class="w-full px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm placeholder-cyan-700"
+                  />
+                </div>
+                <div>
+                  <label class="text-cyan-400 text-[10px] sm:text-xs block mb-0.5">Date</label>
+                  <input 
+                    v-model="match.date"
+                    type="date"
+                    class="w-full px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="text-cyan-400 text-[10px] sm:text-xs block mb-0.5">Time</label>
+                  <input 
+                    v-model="match.time"
+                    type="time"
+                    class="w-full px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="text-emerald-400 text-[10px] sm:text-xs block mb-0.5">Odds Home</label>
+                  <input 
+                    v-model.number="match.odds_home"
+                    type="number"
+                    step="0.01"
+                    placeholder="1.95"
+                    class="w-full px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="text-yellow-400 text-[10px] sm:text-xs block mb-0.5">Odds Draw</label>
+                  <input 
+                    v-model.number="match.odds_draw"
+                    type="number"
+                    step="0.01"
+                    placeholder="3.20"
+                    class="w-full px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm"
+                  />
+                </div>
+                <div>
+                  <label class="text-red-400 text-[10px] sm:text-xs block mb-0.5">Odds Away</label>
+                  <input 
+                    v-model.number="match.odds_away"
+                    type="number"
+                    step="0.01"
+                    placeholder="4.50"
+                    class="w-full px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm"
+                  />
+                </div>
+                <div class="col-span-2">
+                  <label class="text-cyan-400 text-[10px] sm:text-xs block mb-0.5">Status</label>
+                  <select 
+                    v-model="match.status"
+                    class="w-full px-2 sm:px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-xs sm:text-sm"
+                  >
+                    <option value="UPCOMING">🟢 Upcoming</option>
+                    <option value="LIVE">🔴 Live</option>
+                    <option value="FINISHED">⚪ Finished</option>
+                    <option value="CANCELLED">❌ Cancelled</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="bulkForm.matches.length > 0" class="flex flex-col xs:flex-row gap-2 sm:gap-3 pt-4">
+            <button 
+              @click="submitBulkMatches"
+              class="flex-1 py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:from-emerald-400 hover:to-emerald-500 text-sm sm:text-base"
+              :disabled="matchStore.actionLoading"
+            >
+              {{ matchStore.actionLoading ? 'Saving...' : `Save ${bulkForm.matches.length} Matches` }}
+            </button>
+            <button 
+              @click="clearBulkForm"
+              class="px-4 py-2.5 sm:py-3 bg-slate-700 text-cyan-400 rounded-xl font-bold hover:bg-slate-600 text-sm sm:text-base"
+            >
+              Clear All
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 2: FILE UPLOAD -->
+        <div v-if="bulkTab === 'file'">
+          <div class="border-2 border-dashed border-cyan-700 rounded-xl p-6 sm:p-8 text-center hover:border-emerald-500 transition-colors">
+            <div class="mb-3 sm:mb-4">
+              <svg class="w-12 h-12 sm:w-16 sm:h-16 mx-auto text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+              </svg>
+            </div>
+            <p class="text-cyan-400 text-sm sm:text-base mb-1">Drag and drop your CSV or Excel file here</p>
+            <p class="text-cyan-600 text-xs sm:text-sm mb-3 sm:mb-4">or click to browse</p>
+            
+            <input 
+              ref="fileInput"
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              class="hidden"
+              @change="handleFileUpload"
+            />
+            <button 
+              @click="$refs.fileInput.click()"
+              class="px-4 sm:px-6 py-2 sm:py-3 bg-emerald-500 text-slate-900 rounded-xl font-bold hover:bg-emerald-400 text-sm sm:text-base"
+            >
+              Choose File
+            </button>
+
+            <div v-if="uploadedFile" class="mt-3 sm:mt-4 p-3 sm:p-4 bg-slate-900/50 rounded-xl">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2 sm:gap-3">
+                  <span class="text-xl sm:text-2xl">📄</span>
+                  <div class="text-left">
+                    <p class="text-white font-medium text-sm sm:text-base truncate max-w-[150px] sm:max-w-[300px]">{{ uploadedFile.name }}</p>
+                    <p class="text-cyan-400 text-xs sm:text-sm">{{ (uploadedFile.size / 1024).toFixed(1) }} KB</p>
+                  </div>
+                </div>
+                <button 
+                  @click="removeUploadedFile"
+                  class="text-red-400 hover:text-red-300 text-sm sm:text-base"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <button 
+              v-if="uploadedFile"
+              @click="submitFileUpload"
+              class="mt-3 sm:mt-4 w-full py-2.5 sm:py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white rounded-xl font-bold hover:from-emerald-400 hover:to-emerald-500 text-sm sm:text-base"
+              :disabled="matchStore.actionLoading"
+            >
+              {{ matchStore.actionLoading ? 'Uploading...' : `Upload ${uploadedFile.name}` }}
+            </button>
+          </div>
+
+          <div class="mt-3 sm:mt-4 text-center">
+            <button 
+              @click="downloadCSVTemplate"
+              class="text-cyan-400 hover:text-cyan-300 text-xs sm:text-sm underline"
+            >
+              📥 Download CSV Template
+            </button>
+          </div>
+        </div>
+
+        <div class="flex gap-2 sm:gap-3 pt-4 border-t border-cyan-800/30 mt-4 sm:mt-6">
+          <button 
+            @click="closeBulkModal" 
+            class="flex-1 py-2.5 sm:py-3 bg-slate-700 text-cyan-400 rounded-xl font-bold hover:bg-slate-600 text-sm sm:text-base"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Update Odds Modal -->
+    <div v-if="showOddsModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" @click.self="closeOddsModal">
+      <div class="bg-slate-800 rounded-2xl border border-cyan-700 p-4 sm:p-6 w-full max-w-md">
+        <h3 class="text-lg sm:text-xl font-bold text-white mb-2">Update Odds</h3>
+        <p class="text-cyan-400 text-sm mb-4">{{ selectedFixture?.home_team }} vs {{ selectedFixture?.away_team }}</p>
+        
+        <div class="space-y-3 sm:space-y-4">
+          <div>
+            <label class="text-emerald-400 text-xs sm:text-sm block mb-1">Home (1)</label>
+            <input 
+              v-model.number="oddsForm.home"
+              type="number"
+              step="0.01"
+              class="w-full px-3 sm:px-4 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+            />
+          </div>
+          <div>
+            <label class="text-yellow-400 text-xs sm:text-sm block mb-1">Draw (X)</label>
+            <input 
+              v-model.number="oddsForm.draw"
+              type="number"
+              step="0.01"
+              class="w-full px-3 sm:px-4 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+            />
+          </div>
+          <div>
+            <label class="text-red-400 text-xs sm:text-sm block mb-1">Away (2)</label>
+            <input 
+              v-model.number="oddsForm.away"
+              type="number"
+              step="0.01"
+              class="w-full px-3 sm:px-4 py-2 rounded-lg bg-slate-900 border border-cyan-800 text-cyan-100 text-sm"
+            />
+          </div>
+          
+          <div class="flex flex-col xs:flex-row gap-2 sm:gap-3 pt-2">
+            <button @click="confirmUpdateOdds" class="flex-1 py-2.5 sm:py-3 bg-yellow-500 text-slate-900 rounded-xl font-bold hover:bg-yellow-400 text-sm sm:text-base">
+              Update Odds
+            </button>
+            <button @click="closeOddsModal" class="flex-1 py-2.5 sm:py-3 bg-slate-700 text-cyan-400 rounded-xl font-bold hover:bg-slate-600 text-sm sm:text-base">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" @click.self="closeDeleteModal">
+      <div class="bg-slate-800 rounded-2xl border border-red-700 p-4 sm:p-6 w-full max-w-md">
+        <h3 class="text-lg sm:text-xl font-bold text-red-400 mb-3">Delete Fixture</h3>
+        <p class="text-white text-sm sm:text-base mb-1">Are you sure you want to delete this fixture?</p>
+        <p class="text-cyan-400 text-sm mb-3">{{ selectedFixture?.home_team }} vs {{ selectedFixture?.away_team }}</p>
+        <p class="text-red-400 text-xs sm:text-sm mb-4">⚠️ This action cannot be undone!</p>
+        
+        <div class="flex flex-col xs:flex-row gap-2 sm:gap-3">
+          <button @click="confirmDelete" class="flex-1 py-2.5 sm:py-3 bg-red-500 text-white rounded-xl font-bold hover:bg-red-400 text-sm sm:text-base">
+            Delete
+          </button>
+          <button @click="closeDeleteModal" class="flex-1 py-2.5 sm:py-3 bg-slate-700 text-cyan-400 rounded-xl font-bold hover:bg-slate-600 text-sm sm:text-base">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useMatchStore } from '../../../../stores/match/useMatchStore'
+
+// ── Store ──────────────────────────────────────────────────────────────────
+const matchStore = useMatchStore()
+
+// ── Computed ──────────────────────────────────────────────────────────────
+const allMatches = computed(() => {
+  return [...matchStore.upcomingMatches, ...matchStore.liveMatches]
+})
+
+const totalFixtures = computed(() => {
+  return matchStore.upcomingMatches.length + matchStore.liveMatches.length
+})
+
+const upcomingCount = computed(() => {
+  return matchStore.upcomingMatches.length
+})
+
+const liveCount = computed(() => {
+  return matchStore.liveMatches.length
+})
+
+const finishedCount = computed(() => {
+  return matchStore.upcomingMatches.filter(f => f.status === 'FINISHED').length
+})
+
+const totalBetsOnFixtures = computed(() => {
+  return allMatches.value.reduce((sum, f) => sum + (f.totalBets || 0), 0)
+})
+
+// ── Local State ────────────────────────────────────────────────────────────
+const searchQuery = ref('')
+const filterSport = ref('')
+const filterStatus = ref('')
+const searchTimeout = ref(null)
+
+// Modals
+const showCreateModal = ref(false)
+const showBulkModal = ref(false)
+const showOddsModal = ref(false)
+const showDeleteModal = ref(false)
+const isEditing = ref(false)
+const selectedFixture = ref(null)
+const bulkTab = ref('form')
+const uploadedFile = ref(null)
+const fileInput = ref(null)
+
+// Single Match Form
+const fixtureForm = ref({
+  home_team: '',
+  away_team: '',
+  league: '',
+  date: '',
+  time: '',
+  odds_home: null,
+  odds_draw: null,
+  odds_away: null,
+  status: 'UPCOMING'
+})
+
+// Bulk Form
+const bulkForm = ref({
+  numberOfMatches: 5,
+  matches: []
+})
+
+// Odds Form
+const oddsForm = ref({
+  home: null,
+  draw: null,
+  away: null
+})
+
+// ── Format Helpers ──────────────────────────────────────────────────────────
+function formatDate(d) {
+  if (!d) return ''
+  return new Date(d).toLocaleDateString('en-TZ', { 
+    day: '2-digit', 
+    month: 'short', 
+    year: 'numeric' 
+  })
+}
+
+function getStatusIcon(status) {
+  const icons = {
+    UPCOMING: '🟢',
+    LIVE: '🔴',
+    FINISHED: '⚪',
+    CANCELLED: '❌'
+  }
+  return icons[status] || '⚪'
+}
+
+// ── Load Fixtures ──────────────────────────────────────────────────────────
+async function loadFixtures() {
+  await matchStore.fetchAllMatches()
+}
+
+async function refreshFixtures() {
+  searchQuery.value = ''
+  filterSport.value = ''
+  filterStatus.value = ''
+  await matchStore.fetchAllMatches()
+}
+
+function handleSearch() {
+  clearTimeout(searchTimeout.value)
+  searchTimeout.value = setTimeout(() => {
+    loadFixtures()
+  }, 500)
+}
+
+function applyFilters() {
+  loadFixtures()
+}
+
+function resetFilters() {
+  searchQuery.value = ''
+  filterSport.value = ''
+  filterStatus.value = ''
+  loadFixtures()
+}
+
+// ── Single Match CRUD ──────────────────────────────────────────────────────
+function openCreateModal() {
+  isEditing.value = false
+  resetForm()
+  showCreateModal.value = true
+}
+
+function editFixture(fixture) {
+  isEditing.value = true
+  selectedFixture.value = fixture
+  
+  fixtureForm.value = {
+    home_team: fixture.home_team,
+    away_team: fixture.away_team,
+    league: fixture.league || '',
+    date: fixture.date,
+    time: fixture.time,
+    odds_home: fixture.odds?.['1X2']?.home || fixture.odds?.home || null,
+    odds_draw: fixture.odds?.['1X2']?.draw || fixture.odds?.draw || null,
+    odds_away: fixture.odds?.['1X2']?.away || fixture.odds?.away || null,
+    status: fixture.status || 'UPCOMING'
+  }
+  showCreateModal.value = true
+}
+
+function resetForm() {
+  fixtureForm.value = {
+    home_team: '',
+    away_team: '',
+    league: '',
+    date: '',
+    time: '',
+    odds_home: null,
+    odds_draw: null,
+    odds_away: null,
+    status: 'UPCOMING'
+  }
+}
+
+async function saveFixture() {
+  const form = fixtureForm.value
+  
+  const fixtureData = {
+    home_team: form.home_team,
+    away_team: form.away_team,
+    league: form.league || null,
+    date: form.date,
+    time: form.time,
+    odds: {
+      '1X2': {
+        home: form.odds_home || null,
+        draw: form.odds_draw || null,
+        away: form.odds_away || null
+      }
+    },
+    status: form.status
+  }
+
+  try {
+    let result
+    if (isEditing.value && selectedFixture.value) {
+      result = await matchStore.updateMatch(selectedFixture.value.id, fixtureData)
+    } else {
+      result = await matchStore.createMatch(fixtureData)
+    }
+    
+    if (result) {
+      closeModal()
+      await loadFixtures()
+      alert(isEditing.value ? 'Fixture updated successfully!' : 'Fixture created successfully!')
+    }
+  } catch (error) {
+    alert(error.message || 'Failed to save fixture')
+  }
+}
+
+function closeModal() {
+  showCreateModal.value = false
+  selectedFixture.value = null
+  isEditing.value = false
+  resetForm()
+}
+
+// ── Bulk Match Functions ───────────────────────────────────────────────────
+function openBulkModal() {
+  bulkTab.value = 'form'
+  uploadedFile.value = null
+  bulkForm.value = {
+    numberOfMatches: 5,
+    matches: []
+  }
+  showBulkModal.value = true
+}
+
+function closeBulkModal() {
+  showBulkModal.value = false
+  bulkForm.value = { numberOfMatches: 5, matches: [] }
+  uploadedFile.value = null
+}
+
+function generateBulkForm() {
+  const count = Math.min(bulkForm.value.numberOfMatches || 1, 20)
+  const currentLength = bulkForm.value.matches.length
+  
+  if (count > currentLength) {
+    for (let i = currentLength; i < count; i++) {
+      bulkForm.value.matches.push({
+        home_team: '',
+        away_team: '',
+        league: '',
+        date: '',
+        time: '',
+        odds_home: null,
+        odds_draw: null,
+        odds_away: null,
+        status: 'UPCOMING'
+      })
+    }
+  } else if (count < currentLength) {
+    bulkForm.value.matches = bulkForm.value.matches.slice(0, count)
+  }
+}
+
+function removeBulkMatch(index) {
+  bulkForm.value.matches.splice(index, 1)
+}
+
+function clearBulkForm() {
+  bulkForm.value.matches = []
+  bulkForm.value.numberOfMatches = 5
+}
+
+async function submitBulkMatches() {
+  const invalid = bulkForm.value.matches.some(m => 
+    !m.home_team || !m.away_team || !m.date || !m.time
+  )
+  
+  if (invalid) {
+    alert('Please fill in all required fields (Home Team, Away Team, Date, Time) for each match')
+    return
+  }
+
+  const matches = bulkForm.value.matches.map(m => ({
+    home_team: m.home_team,
+    away_team: m.away_team,
+    league: m.league || null,
+    date: m.date,
+    time: m.time,
+    odds: {
+      '1X2': {
+        home: m.odds_home || null,
+        draw: m.odds_draw || null,
+        away: m.odds_away || null
+      }
+    },
+    status: m.status || 'UPCOMING'
+  }))
+
+  try {
+    const result = await matchStore.createMultipleMatches(matches)
+    
+    if (result) {
+      closeBulkModal()
+      await loadFixtures()
+      alert(`${matches.length} matches created successfully!`)
+    }
+  } catch (error) {
+    alert(error.message || 'Failed to create matches')
+  }
+}
+
+// ── File Upload Functions ─────────────────────────────────────────────────
+function handleFileUpload(event) {
+  const file = event.target.files[0]
+  if (file) {
+    uploadedFile.value = file
+  }
+  event.target.value = ''
+}
+
+function removeUploadedFile() {
+  uploadedFile.value = null
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
+}
+
+async function submitFileUpload() {
+  if (!uploadedFile.value) {
+    alert('Please select a file first')
+    return
+  }
+
+  try {
+    const result = await matchStore.uploadMatchesFile(uploadedFile.value)
+    
+    if (result) {
+      closeBulkModal()
+      await loadFixtures()
+      alert('File uploaded and matches created successfully!')
+    }
+  } catch (error) {
+    alert(error.message || 'Failed to upload file')
+  }
+}
+
+function downloadCSVTemplate() {
+  const headers = ['home_team','away_team','league','date','time','odds_home','odds_draw','odds_away','status']
+  const sampleRow = ['Manchester United','Liverpool','Premier League','2024-12-25','15:00','1.95','3.20','4.50','UPCOMING']
+  
+  const csvContent = [
+    headers.join(','),
+    sampleRow.join(',')
+  ].join('\n')
+  
+  const blob = new Blob([csvContent], { type: 'text/csv' })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'fixtures_template.csv'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
+// ── Update Odds ────────────────────────────────────────────────────────────
+function openUpdateOdds(fixture) {
+  selectedFixture.value = fixture
+  oddsForm.value = {
+    home: fixture.odds?.['1X2']?.home || fixture.odds?.home || null,
+    draw: fixture.odds?.['1X2']?.draw || fixture.odds?.draw || null,
+    away: fixture.odds?.['1X2']?.away || fixture.odds?.away || null
+  }
+  showOddsModal.value = true
+}
+
+async function confirmUpdateOdds() {
+  if (!selectedFixture.value) return
+
+  try {
+    const result = await matchStore.updateOdds(
+      selectedFixture.value.id,
+      oddsForm.value
+    )
+
+    if (result) {
+      closeOddsModal()
+      await loadFixtures()
+      alert('Odds updated successfully!')
+    }
+  } catch (error) {
+    alert(error.message || 'Failed to update odds')
+  }
+}
+
+function closeOddsModal() {
+  showOddsModal.value = false
+  selectedFixture.value = null
+  oddsForm.value = { home: null, draw: null, away: null }
+}
+
+// ── Toggle Status ──────────────────────────────────────────────────────────
+async function toggleStatus(fixture) {
+  const statusMap = {
+    UPCOMING: 'LIVE',
+    LIVE: 'FINISHED',
+    FINISHED: 'UPCOMING',
+    CANCELLED: 'UPCOMING'
+  }
+  
+  const newStatus = statusMap[fixture.status] || 'UPCOMING'
+  
+  if (confirm(`Change status from ${fixture.status} to ${newStatus}?`)) {
+    try {
+      const result = await matchStore.updateStatus(fixture.id, newStatus)
+      if (result) {
+        await loadFixtures()
+        alert('Status updated successfully!')
+      }
+    } catch (error) {
+      alert(error.message || 'Failed to update status')
+    }
+  }
+}
+
+// ── Delete ──────────────────────────────────────────────────────────────────
+function openDeleteModal(fixture) {
+  selectedFixture.value = fixture
+  showDeleteModal.value = true
+}
+
+async function confirmDelete() {
+  if (!selectedFixture.value) return
+
+  try {
+    const result = await matchStore.deleteMatch(selectedFixture.value.id)
+
+    if (result) {
+      closeDeleteModal()
+      await loadFixtures()
+      alert('Fixture deleted successfully!')
+    }
+  } catch (error) {
+    alert(error.message || 'Failed to delete fixture')
+  }
+}
+
+function closeDeleteModal() {
+  showDeleteModal.value = false
+  selectedFixture.value = null
+}
+
+// ── Lifecycle ──────────────────────────────────────────────────────────────
+onMounted(() => {
+  loadFixtures()
+})
+</script>
+
+<style scoped>
+/* Custom scrollbar */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: rgba(6, 182, 212, 0.3);
+  border-radius: 2px;
+}
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(6, 182, 212, 0.5);
+}
+</style>
