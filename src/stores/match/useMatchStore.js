@@ -168,7 +168,7 @@ export const useMatchStore = defineStore('match', {
     initMatchSocket() {
       if (this.socket) return
 
-      this.socket = io('http://localhost:5000', {
+      this.socket = io('https://boombet365.com/api', {
         transports: ['websocket'],
         autoConnect: true
       })
