@@ -10,7 +10,8 @@ class SocketService {
     if (this.socket) return
 
     // Tumia URL ile ile ya backend yako (bila '/api')
-    this.socket = io('http://localhost:5000', {
+    // http://localhost:5000
+    this.socket = io('https://boombet365.com/api', {
       transports: ['websocket'],
       autoConnect: true,
     })
