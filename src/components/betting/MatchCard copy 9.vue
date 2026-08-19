@@ -1,5 +1,7 @@
+<!-- MatchCard.vue -->
 <template>
   <div class="bg-cyan-900/20 border-b border-cyan-800/40 p-2 hover:border-cyan-700/50 transition-all duration-200">
+
     <!-- Match Header & Teams -->
     <div @click="goToDetail" class="cursor-pointer p-1.5 rounded-lg transition-colors">
       <div class="flex items-center justify-between mb-1">
@@ -10,17 +12,17 @@
           </span>
         </div>
         <div class="flex items-center gap-2">
-          <!-- ONYESHA DAKIKA REAL-TIME AU TAREHE/SASA KWA UPCOMING -->
+          <!-- ✅ ONYESHA DAKIKA KUTOKA EVENTS -->
           <span 
             class="text-[12px] font-bold" 
-            :class="isLive ? 'text-red-400 animate-pulse' : 'text-cyan-400'"
+            :class="isLive ? 'text-red-400 animate-pulse' : 'text-cyan-500'"
           >
             {{ displayTime }}
           </span>
         </div>
       </div>
 
-      <!-- Teams -->
+      <!-- Teams (remain same) -->
       <div class="grid grid-cols-3 items-center gap-3 mb-1">
         <div class="text-left">
           <p class="text-sm font-bold text-cyan-100 truncate">{{ homeTeamName }}</p>
@@ -38,7 +40,7 @@
       </div>
     </div>
 
-    <!-- Odds Row -->
+    <!-- Odds Row (remain same) -->
     <div class="flex gap-2 mt-1" v-if="formatted1X2Odds.length">
       <OddCard
         v-for="odd in formatted1X2Odds" 
@@ -54,7 +56,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import OddCard from './OddsCard.vue'
 import { useBetStore } from '../../stores/bet/betStore.js'
@@ -63,100 +65,60 @@ const router = useRouter()
 const betStore = useBetStore()
 const props = defineProps({ match: { type: Object, required: true } })
 
-const homeTeamName = computed(() => props.match?.home_team || props.match?.homeTeam || 'Home')
-const awayTeamName = computed(() => props.match?.away_team || props.match?.awayTeam || 'Away')
-const isLive = computed(() => props.match?.status === 'LIVE' || props.match?.live || false)
-const currentScore = computed(() => props.match?.current_score || props.match?.score || { home: 0, away: 0 })
+// ✅ REF kwa ajili ya kuonyesha muda
+const displayTime = ref(props.match.time || '')
 
-// HELPER FUNCTION KWA AJILI YA UPCOMING MATCH FORMATTING
-function formatUpcomingTime(dateStr, timeStr) {
-  if (!dateStr && !timeStr) return props.match?.time || ''
-
-  try {
-    let matchDateObj
-
-    // Kama tuna date na time tofauti au iliyoungana
-    if (dateStr && timeStr) {
-      matchDateObj = new Date(`${dateStr}T${timeStr}`)
-      if (isNaN(matchDateObj.getTime())) {
-        matchDateObj = new Date(`${dateStr} ${timeStr}`)
-      }
-    } else if (dateStr) {
-      matchDateObj = new Date(dateStr)
-    } else {
-      return timeStr
+// ✅ FUNCTION KUPATA DAKIKA KUTOKA EVENTS
+const getCurrentMinuteFromEvents = (matchData) => {
+  if (!matchData?.predetermined_script?.events_timeline) return null
+  
+  const events = matchData.predetermined_script.events_timeline
+  
+  // Kama match iko LIVE, chukua event ya mwisho
+  if (matchData.status === 'LIVE' || matchData.live) {
+    // Tafuta event ya mwisho iliyorekodiwa
+    const lastEvent = events[events.length - 1]
+    if (lastEvent && lastEvent.minute !== undefined) {
+      return lastEvent.minute
     }
+  }
+  
+  return null
+}
 
-    if (isNaN(matchDateObj.getTime())) {
-      return timeStr || dateStr
-    }
-
-    const today = new Date()
-    const isToday =
-      matchDateObj.getDate() === today.getDate() &&
-      matchDateObj.getMonth() === today.getMonth() &&
-      matchDateObj.getFullYear() === today.getFullYear()
-
-    // Forma ya Mfumo wa Saa: "8:00 PM"
-    const timeFormatted = matchDateObj.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    })
-
-    if (isToday) {
-      return `${timeFormatted} Today`
-    } else {
-      // Forma ya Siku na Tarehe: "Thu 20/08"
-      const dayName = matchDateObj.toLocaleDateString('en-US', { weekday: 'short' })
-      const dayNum = String(matchDateObj.getDate()).padStart(2, '0')
-      const monthNum = String(matchDateObj.getMonth() + 1).padStart(2, '0')
-
-      return `${timeFormatted} ${dayName} ${dayNum}/${monthNum}`
-    }
-  } catch (err) {
-    return timeStr || dateStr || ''
+// ✅ FUNCTION YA KU-UPDATE DISPLAY TIME
+const updateDisplayTime = (matchData) => {
+  if (!matchData) return
+  
+  // Kama ni LIVE
+  if (matchData.status === 'LIVE' || matchData.live) {
+    const currentMinute = getCurrentMinuteFromEvents(matchData)
+    displayTime.value = currentMinute ? `${currentMinute}'` : 'LIVE'
+  } else {
+    // Kwa upcoming, tumia time iliyopo
+    displayTime.value = matchData.time || ''
   }
 }
 
-// REALTIME COMPUTED DAKIKA & DATE/TIME UPDATE
-const displayTime = computed(() => {
-  if (!props.match) return ''
-
-  if (isLive.value) {
-    // 1. Kama Socket / Store imepokea elapsed_minute
-    if (props.match.elapsed_minute !== undefined && props.match.elapsed_minute !== null) {
-      const elapsed = parseInt(props.match.elapsed_minute)
-      return elapsed >= 90 ? "90+'" : `${elapsed}'`
-    }
-
-    // 2. Kama socket / backend time ina string yenye dakika (mfano "45'")
-    if (typeof props.match.time === 'string' && props.match.time.includes("'")) {
-      return props.match.time
-    }
-
-    // 3. Clock time calculation kama fallback
-    if (props.match.date && props.match.time && props.match.time.includes(':')) {
-      const matchStart = new Date(`${props.match.date} ${props.match.time}`)
-      const now = new Date()
-      const elapsedMinutes = Math.floor((now - matchStart) / (1000 * 60))
-
-      if (!isNaN(elapsedMinutes) && elapsedMinutes >= 0) {
-        return elapsedMinutes >= 90 ? "90+'" : `${elapsedMinutes}'`
-      }
-    }
-
-    return 'LIVE'
+// ✅ Watch kwa mabadiliko ya match (kutoka socket updates)
+watch(() => props.match, (newMatch) => {
+  if (newMatch) {
+    updateDisplayTime(newMatch)
   }
+}, { deep: true })
 
-  // UPCOMING MATCH DISPLAY FORMAT:
-  return formatUpcomingTime(props.match.date || props.match.match_date, props.match.time || props.match.match_time)
-})
+// Getters
+const homeTeamName = computed(() => props.match.home_team || props.match.homeTeam)
+const awayTeamName = computed(() => props.match.away_team || props.match.awayTeam)
+const isLive = computed(() => props.match.status === 'LIVE' || props.match.live || false)
+const currentScore = computed(() => props.match.current_score || props.match.score || { home: 0, away: 0 })
 
+// Format 1X2 Odds (remain same)
 const formatted1X2Odds = computed(() => {
   if (!props.match?.odds) return []
 
   const odds1X2 = props.match.odds['1X2'] || props.match.odds
+
   if (Array.isArray(odds1X2)) return odds1X2
 
   const options = []
@@ -186,9 +148,15 @@ function selectOdd(odd) {
 
 function goToDetail() {
   if (!props.match?.id) return
+
   router.push({
     name: 'sport-detail',
     params: { id: props.match.id }
   })
 }
+
+// ✅ Initialize display time on mount
+onMounted(() => {
+  updateDisplayTime(props.match)
+})
 </script>

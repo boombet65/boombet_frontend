@@ -42,10 +42,9 @@
           <span class="text-xs text-cyan-700">{{ league.matches.length }} matches</span>
         </div>
         <div class="grid gap-3 sm:grid-cols-1 xl:grid-cols-1">
-          <!-- ✅ Dynamic key inayolazimisha re-render pindi dakika au score inapobadilika -->
           <MatchCard 
             v-for="match in league.matches" 
-            :key="`${match.id}-${match.time}-${match.score?.home}-${match.score?.away}-${match.status}`" 
+            :key="match.id" 
             :match="match"
           />
         </div>
@@ -67,6 +66,7 @@ import EmptyState from '../../components/shared/EmptyState.vue'
 import { useMatchStore } from '../../stores/match/useMatchStore.js'
 
 const matchStore = useMatchStore()
+
 const activeSport = ref('football')
 
 const sports = [
@@ -77,92 +77,88 @@ const sports = [
   { key: 'rugby',      label: 'Rugby',      icon: '🏉' },
 ]
 
-// HELPER: Format Time & Date Kwa Upcoming Match
-const formatUpcomingDateTime = (dateString, timeString) => {
-  if (!dateString && !timeString) return ''
-
-  try {
-    let matchDateObj
-    if (dateString && timeString) {
-      matchDateObj = new Date(`${dateString}T${timeString}`)
-      if (isNaN(matchDateObj.getTime())) {
-        matchDateObj = new Date(`${dateString} ${timeString}`)
-      }
-    } else if (dateString) {
-      matchDateObj = new Date(dateString)
-    }
-
-    if (!matchDateObj || isNaN(matchDateObj.getTime())) {
-      return timeString || dateString || ''
-    }
-
-    const today = new Date()
-    const isToday =
-      matchDateObj.getDate() === today.getDate() &&
-      matchDateObj.getMonth() === today.getMonth() &&
-      matchDateObj.getFullYear() === today.getFullYear()
-
-    const formattedTime = matchDateObj.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    })
-
-    if (isToday) {
-      return `${formattedTime} Today`
-    } else {
-      const dayName = matchDateObj.toLocaleDateString('en-US', { weekday: 'short' })
-      const dayNum = String(matchDateObj.getDate()).padStart(2, '0')
-      const monthNum = String(matchDateObj.getMonth() + 1).padStart(2, '0')
-
-      return `${formattedTime} ${dayName} ${dayNum}/${monthNum}`
-    }
-  } catch (err) {
-    return timeString || dateString || ''
-  }
-}
-
-// HELPER: Pata Dakika kutoka events_timeline au elapsed_minute
-const getCurrentMinuteFromEvents = (match) => {
-  if (match?.predetermined_script?.events_timeline?.length > 0) {
-    const events = match.predetermined_script.events_timeline
-    const lastEvent = events[events.length - 1]
-    if (lastEvent && lastEvent.minute !== undefined) {
-      return lastEvent.minute
-    }
-  }
-  return match.elapsed_minute ?? null
-}
-
-// Helper Function: Format Match Data kwa ajili ya MatchCard
+// Helper Function: Kubadilisha Muundo wa DB kwenda kwenye Muundo unaosomwa na MatchCard.vue
 const formatMatchForCard = (dbMatch) => {
-  const odds1X2 = dbMatch.odds?.['1X2'] || dbMatch.odds || {}
+  const odds1X2 = dbMatch.odds?.['1X2'] || {}
 
+  // Format date function
+  const formatDate = (dateString) => {
+    if (!dateString) return ''
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return dateString
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const dayName = days[date.getDay()]
+    const day = String(date.getDate()).padStart(2, '0')
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    return `${dayName} ${day}/${month}`
+  }
+
+  // Format time with AM/PM
+  const formatTimeWithAMPM = (timeStr) => {
+    if (!timeStr) return ''
+    
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    if (isNaN(hours) || isNaN(minutes)) return timeStr
+    
+    const ampm = hours >= 12 ? 'PM' : 'AM'
+    const hour12 = hours % 12 || 12
+    return `${String(hour12).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${ampm}`
+  }
+
+  // ✅ FUNCTION KUPATA DAKIKA KUTOKA EVENTS
+  const getCurrentMinuteFromEvents = (match) => {
+    if (!match?.predetermined_script?.events_timeline) return null
+    
+    const events = match.predetermined_script.events_timeline
+    
+    // Kama match iko LIVE, chukua event ya mwisho
+    if (match.status === 'LIVE') {
+      const lastEvent = events[events.length - 1]
+      if (lastEvent && lastEvent.minute !== undefined) {
+        return lastEvent.minute
+      }
+    }
+    
+    return null
+  }
+
+  // ✅ PATA DAKIKA KWA LIVE MATCH
   let displayTime = ''
-  const isLive = dbMatch.status === 'LIVE' || dbMatch.live === true
-
-  if (isLive) {
+  if (dbMatch.status === 'LIVE') {
+    // Jaribu kupata dakika kutoka events
     const currentMinute = getCurrentMinuteFromEvents(dbMatch)
-    if (currentMinute !== null && currentMinute !== undefined) {
+    
+    // Kama hakuna events, tumia elapsed_minute ikiwa ipo
+    if (currentMinute !== null) {
       displayTime = `${currentMinute}'`
+    } else if (dbMatch.elapsed_minute) {
+      displayTime = `${dbMatch.elapsed_minute}'`
     } else {
       displayTime = 'LIVE'
     }
   } else {
-    displayTime = formatUpcomingDateTime(dbMatch.date || dbMatch.match_date, dbMatch.time || dbMatch.match_time)
+    // UPCOMING: onyesha time na date: "07:00 PM Sat 08/08"
+    const dateStr = formatDate(dbMatch.date)
+    const timeStr = formatTimeWithAMPM(dbMatch.time)
+    displayTime = timeStr && dateStr ? `${timeStr} ${dateStr}` : (timeStr || dateStr || '')
   }
 
+  console.log('📅 Match:', dbMatch.home_team, 'vs', dbMatch.away_team)
+  console.log('📅 Status:', dbMatch.status)
+  console.log('📅 Events Timeline:', dbMatch.predetermined_script?.events_timeline?.length || 0)
+  console.log('📅 Display Time:', displayTime)
+
   return {
-    ...dbMatch,
     id: dbMatch.id,
     league: dbMatch.league || 'General League',
-    time: displayTime, // ✅ Hapa ndipo dakika za LIVE (kama 45') zinapowekwa
-    homeTeam: dbMatch.home_team || dbMatch.homeTeam,
-    awayTeam: dbMatch.away_team || dbMatch.awayTeam,
-    live: isLive,
+    time: displayTime,  // ← HAPA INAONYESHA DAKIKA KWA LIVE, AU TIME KWA UPCOMING
+    homeTeam: dbMatch.home_team,
+    date: dbMatch.date || '',
+    awayTeam: dbMatch.away_team,
+    live: dbMatch.status === 'LIVE',
     status: dbMatch.status,
+    predetermined_script: dbMatch.predetermined_script, // ✅ PITISHA SCRIPT
     elapsed_minute: dbMatch.elapsed_minute,
-    current_score: dbMatch.current_score || { home: 0, away: 0 },
     score: {
       home: dbMatch.current_score?.home ?? 0,
       away: dbMatch.current_score?.away ?? 0
@@ -175,12 +171,11 @@ const formatMatchForCard = (dbMatch) => {
   }
 }
 
-// Computed Property - Inasoma mechi zote (Live & Upcoming) kwa ustadi kutoka Pinia store
+// Computed Property - All matches formatted
 const formattedMatches = computed(() => {
-  const live = matchStore.liveMatches || []
-  const upcoming = matchStore.upcomingMatches || []
-  
-  return [...live, ...upcoming].map(formatMatchForCard)
+  // Combine both upcoming and live matches
+  const allMatches = [...matchStore.upcomingMatches, ...matchStore.liveMatches]
+  return allMatches.map(formatMatchForCard)
 })
 
 // Group matches by league
@@ -193,6 +188,7 @@ const groupedMatches = computed(() => {
   return Object.values(groups)
 })
 
+// Fetch Matches & Connect Socket Lifecycle Hooks
 onMounted(() => {
   matchStore.fetchAllMatches()
   matchStore.initMatchSocket()

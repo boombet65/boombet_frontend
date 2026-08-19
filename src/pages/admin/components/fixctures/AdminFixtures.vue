@@ -312,4 +312,9 @@ async function handleDelete() {
 
 // ── Lifecycle ──────────────────────────────────────────────────────────────
 onMounted(loadFixtures)
+
+onMounted(async () => {
+  await loadFixtures()
+  console.log("matches object here:", allMatches.value)
+})
 </script>

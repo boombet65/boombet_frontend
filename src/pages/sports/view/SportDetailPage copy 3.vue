@@ -17,9 +17,9 @@
           
           <!-- Center Content -->
           <div class="text-center flex-1 px-2">
-            <span class="text-sm sm:text-base font-black text-cyan-100 truncate" v-if="matchData">
+            <h1 class="text-sm sm:text-base font-black text-cyan-100 truncate" v-if="matchData">
               {{ matchData.homeTeam }} <span class="text-yellow-400 font-bold">vs</span> {{ matchData.awayTeam }}
-            </span>
+            </h1>
             <p class="text-[10px] sm:text-xs text-cyan-500 font-medium truncate" v-if="matchData">{{ matchData.league }}</p>
           </div>
 
@@ -41,13 +41,13 @@
       <div class="bg-gradient-to-b from-cyan-900/30 to-cyan-950/60 rounded-2xl border border-cyan-800/40 p-4 shadow-xl backdrop-blur-sm">
         <div class="flex flex-col items-center">
           
-          <!-- Status Badge / Display Time (SASA INAPRINT DAKIKA TU BILA LIVE YA MARUDIO) -->
+          <!-- Status Badge -->
           <div class="mb-3">
-            <span v-if="matchData.live" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/30 animate-pulse">
-              <span class="w-2 h-2 rounded-full bg-red-500"></span>Live  {{ matchData.displayTime }}
+            <span v-if="matchData.live" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/30">
+              <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> LIVE
             </span>
             <span v-else class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-900/40 text-cyan-400 border border-cyan-800/60">
-              ⏳ {{ matchData.displayTime }}
+              ⏳ {{ matchData.time || 'Upcoming' }}
             </span>
           </div>
 
@@ -55,7 +55,7 @@
           <div class="flex items-center justify-between w-full max-w-xl gap-2">
             <!-- Home Team -->
             <div class="flex flex-col items-center flex-1 text-center">
-              <div class="w-12 h-12  rounded-2xl bg-cyan-900/50 border border-cyan-700/50 flex items-center justify-center text-sm  font-black text-yellow-400 mb-2 shadow-inner">
+              <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-cyan-900/50 border border-cyan-700/50 flex items-center justify-center text-sm sm:text-2xl font-black text-yellow-400 mb-2 shadow-inner">
                 {{ getTeamInitials(matchData.homeTeam) }}
               </div>
               <span class="text-xs sm:text-sm font-bold text-cyan-100 line-clamp-1">{{ matchData.homeTeam }}</span>
@@ -65,12 +65,12 @@
             <!-- VS -->
             <div class="flex flex-col items-center px-2">
               <span class="text-xs font-black text-cyan-500 bg-cyan-900/40 px-2.5 py-1 rounded-lg border border-cyan-800/60">VS</span>
-              <span v-if="!matchData.live" class="text-[10px] text-cyan-400 mt-2 font-mono">{{ matchData.displayTime }}</span>
+              <span class="text-[10px] text-cyan-400 mt-2 font-mono">{{ matchData.date }}</span>
             </div>
 
             <!-- Away Team -->
             <div class="flex flex-col items-center flex-1 text-center">
-              <div class="w-12 h-12  rounded-2xl bg-cyan-900/50 border border-cyan-700/50 flex items-center justify-center text-sm  font-black text-yellow-400 mb-2 shadow-inner">
+              <div class="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-cyan-900/50 border border-cyan-700/50 flex items-center justify-center text-sm sm:text-2xl font-black text-yellow-400 mb-2 shadow-inner">
                 {{ getTeamInitials(matchData.awayTeam) }}
               </div>
               <span class="text-xs sm:text-sm font-bold text-cyan-100 line-clamp-1">{{ matchData.awayTeam }}</span>
@@ -94,10 +94,10 @@
               <span class="w-1.5 h-3 bg-yellow-400 rounded-full"></span>
               {{ market.title }}
             </h3>
-            <span class="text-[10px] text-cyan-500 font-mono">{{ market.options.length }} options</span>
+            <span class="text-[10px] text-cyan-500 font-mono">{{ Object.keys(market.options).length }} options</span>
           </div>
 
-          <!-- Market Odds Grid -->
+         <!-- Market Odds Grid -->
           <div 
             class="grid gap-2"
             :class="getGridColsClass(market.key, market.options.length)"
@@ -116,6 +116,7 @@
             </button>
           </div>
 
+
         </div>
       </div>
 
@@ -124,7 +125,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useBetStore } from '../../../stores/bet/betStore.js'
 import { useMatchStore } from '../../../stores/match/useMatchStore.js'
@@ -136,59 +137,12 @@ const matchStore = useMatchStore()
 
 const matchId = computed(() => route.params.id || route.query.id)
 
+
+
 const formatOdds = (val) => {
   const num = parseFloat(val)
   return isNaN(num) ? val : num.toFixed(2)
 }
-
-// HELPER FUNCTION KWA AJILI YA UPCOMING MATCH FORMATTING (MATCHCARD PARITY)
-function formatUpcomingDateTime(dateStr, timeStr) {
-  if (!dateStr && !timeStr) return rawMatch.value?.time || 'Upcoming'
-
-  try {
-    let matchDateObj
-
-    if (dateStr && timeStr) {
-      matchDateObj = new Date(`${dateStr}T${timeStr}`)
-      if (isNaN(matchDateObj.getTime())) {
-        matchDateObj = new Date(`${dateStr} ${timeStr}`)
-      }
-    } else if (dateStr) {
-      matchDateObj = new Date(dateStr)
-    } else {
-      return timeStr
-    }
-
-    if (isNaN(matchDateObj.getTime())) {
-      return timeStr || dateStr
-    }
-
-    const today = new Date()
-    const isToday =
-      matchDateObj.getDate() === today.getDate() &&
-      matchDateObj.getMonth() === today.getMonth() &&
-      matchDateObj.getFullYear() === today.getFullYear()
-
-    const timeFormatted = matchDateObj.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    })
-
-    if (isToday) {
-      return `${timeFormatted} Today`
-    } else {
-      const dayName = matchDateObj.toLocaleDateString('en-US', { weekday: 'short' })
-      const dayNum = String(matchDateObj.getDate()).padStart(2, '0')
-      const monthNum = String(matchDateObj.getMonth() + 1).padStart(2, '0')
-
-      return `${timeFormatted} ${dayName} ${dayNum}/${monthNum}`
-    }
-  } catch (err) {
-    return timeStr || dateStr || ''
-  }
-}
-
 // Tafuta match kutoka Store
 const rawMatch = computed(() => {
   if (!matchId.value) return null
@@ -196,56 +150,23 @@ const rawMatch = computed(() => {
          matchStore.liveMatches.find(m => m.id == matchId.value) || null
 })
 
-// DAKIKA REAL-TIME AUD DATE/TIME (SAME LOGIC AS MATCHCARD)
+// General match information
 const matchData = computed(() => {
   if (!rawMatch.value) return null
   const m = rawMatch.value
-  const isLive = m.status === 'LIVE' || m.live || false
-
-  let calculatedDisplayTime = ''
-
-  if (isLive) {
-    // 1. Kama Socket / Store imepokea elapsed_minute
-    if (m.elapsed_minute !== undefined && m.elapsed_minute !== null) {
-      const elapsed = parseInt(m.elapsed_minute)
-      calculatedDisplayTime = elapsed >= 90 ? "90+'" : `${elapsed}'`
-    }
-    // 2. Kama socket / backend time ina string yenye dakika (mfano "45'")
-    else if (typeof m.time === 'string' && m.time.includes("'")) {
-      calculatedDisplayTime = m.time
-    }
-    // 3. Clock time calculation kama fallback
-    else if (m.date && m.time && m.time.includes(':')) {
-      const matchStart = new Date(`${m.date} ${m.time}`)
-      const now = new Date()
-      const elapsedMinutes = Math.floor((now - matchStart) / (1000 * 60))
-
-      if (!isNaN(elapsedMinutes) && elapsedMinutes >= 0) {
-        calculatedDisplayTime = elapsedMinutes >= 90 ? "90+'" : `${elapsedMinutes}'`
-      }
-    }
-    // 4. Default kama zote hazijapatikana
-    else {
-      calculatedDisplayTime = 'LIVE'
-    }
-  } else {
-    // UPCOMING MATCH DISPLAY FORMAT
-    calculatedDisplayTime = formatUpcomingDateTime(m.date || m.match_date, m.time || m.match_time)
-  }
-
   return {
     id: m.id,
-    homeTeam: m.home_team || m.homeTeam || 'Home',
-    awayTeam: m.away_team || m.awayTeam || 'Away',
+    homeTeam: m.home_team || m.homeTeam,
+    awayTeam: m.away_team || m.awayTeam,
     league: m.league,
-    displayTime: calculatedDisplayTime,
-    date: m.date || m.match_date || '',
-    live: isLive,
-    score: m.current_score || m.score || { home: 0, away: 0 }
+    time: m.time,
+    date: m.date,
+    live: m.status === 'LIVE' || m.live || false,
+    score: m.current_score || { home: 0, away: 0 }
   }
 })
 
-// Majina ya Masoko
+// Majina ya Masoko kwa Kiswahili/Kiingereza Kizuri cha Betting
 const marketTitleMap = {
   '1X2': '1X2 | Full Time',
   'Double_Chance': 'Double Chance',
@@ -263,6 +184,7 @@ const marketTitleMap = {
   'Clean_Sheet': 'Clean Sheet'
 }
 
+// Kanuni za Mpangilio wa Masoko (Array ya Vipaumbele)
 const optionOrderMap = {
   '1X2': ['1', 'X', '2'],
   'Double_Chance': ['1X', '12', 'X2'],
@@ -280,21 +202,25 @@ const formattedMarkets = computed(() => {
     const rawOptions = oddsObj[marketKey] || {}
     const optionsArray = []
     
+    // Kama tuna order mahususi (Mfano: 1, X, 2)
     if (optionOrderMap[marketKey]) {
       const preferredOrder = optionOrderMap[marketKey]
       
+      // 1. Weka vile vilivyo kwenye mpangilio unaotakiwa
       preferredOrder.forEach(key => {
         if (rawOptions[key] !== undefined) {
           optionsArray.push({ key: key, value: rawOptions[key] })
         }
       })
 
+      // 2. Kama kuna key yoyote iliyobaki kutoka DB, iongeze mwishoni
       Object.keys(rawOptions).forEach(key => {
         if (!preferredOrder.includes(key)) {
           optionsArray.push({ key: key, value: rawOptions[key] })
         }
       })
     } else {
+      // Masoko mengine badilisha tu kutoka Object kwenda Array
       Object.keys(rawOptions).forEach(key => {
         optionsArray.push({ key: key, value: rawOptions[key] })
       })
@@ -303,11 +229,12 @@ const formattedMarkets = computed(() => {
     return {
       key: marketKey,
       title: marketTitleMap[marketKey] || marketKey.replace(/_/g, ' '),
-      options: optionsArray
+      options: optionsArray // Hapa sasa ni Array badala ya Object!
     }
   })
 })
 
+// MPANGILIO WA GRID (Responsive Columns kulingana na aina ya soko)
 const getGridColsClass = (marketKey, totalOptions) => {
   if (marketKey === '1X2' || marketKey === 'Double_Chance' || marketKey === 'Highest_Scoring_Half') {
     return 'grid-cols-3'
@@ -324,6 +251,7 @@ const getGridColsClass = (marketKey, totalOptions) => {
   return 'grid-cols-2'
 }
 
+// Format Option Label ili ikae vizuri (Mfano: "OVER_2.5" -> "Over 2.5", "Home_Home" -> "Home / Home")
 const formatOptionLabel = (optionKey, marketKey) => {
   if (marketKey === '1X2') {
     if (optionKey === '1') return `1 `
@@ -346,7 +274,7 @@ const isSelected = (marketKey, optionKey) => {
 
 const getOddButtonClass = (marketKey, optionKey) => {
   if (isSelected(marketKey, optionKey)) {
-    return 'border-yellow-400 bg-yellow-400/20 shadow-lg shadow-yellow-400/10 text-yellow-300 font-black ring-1 ring-yellow-400/50'
+    return 'border-yellow-400 bg-yellow-400/20 shadow-lg shadow-yellow-400/10 text-yellow-300 font-black  ring-1 ring-yellow-400/50'
   }
   return 'bg-cyan-900/40 border-cyan-800/60 text-cyan-200 hover:border-cyan-500 hover:bg-cyan-900/60'
 }
@@ -385,10 +313,5 @@ onMounted(() => {
   if (matchStore.upcomingMatches.length === 0 && matchStore.liveMatches.length === 0) {
     matchStore.fetchAllMatches()
   }
-  matchStore.initMatchSocket()
-})
-
-onUnmounted(() => {
-  matchStore.disconnectSocket()
 })
 </script>

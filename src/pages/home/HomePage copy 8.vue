@@ -1,9 +1,11 @@
+<!-- src/pages/home/HomePage.vue -->
 <template>
   <div class="min-h-screen">
-    <!-- Hero Section -->
+
+    <!-- ── Hero ── -->
     <AutoPlay />
 
-    <!-- Quick nav pills -->
+    <!-- ── Quick nav pills ── -->
     <section class="px-1 py-4 border-b border-cyan-800/40 overflow-x-auto" style="scrollbar-width:none;">
       <div class="flex gap-2 min-w-max mx-auto">
         <RouterLink v-for="cat in quickCats" :key="cat.label" :to="cat.to"
@@ -14,6 +16,7 @@
     </section>
 
     <div class="max-w-7xl mx-auto px-0 py-6 space-y-8">
+
       <!-- Loading State -->
       <div v-if="matchStore.loading" class="text-center py-10">
         <p class="text-cyan-400 font-semibold animate-pulse">Inapakia Mechi...</p>
@@ -25,7 +28,7 @@
       </div>
 
       <template v-else>
-        <!-- Featured / Upcoming matches -->
+        <!-- ── Featured / Upcoming matches ── -->
         <section>
           <div class="flex items-center justify-between mb-4 px-2">
             <h2 class="text-sm font-black text-cyan-100">⚽ Featured Matches</h2>
@@ -41,7 +44,7 @@
           </div>
         </section>
 
-        <!-- Live now -->
+        <!-- ── Live now ── -->
         <section>
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-black text-cyan-100 flex items-center gap-2">
@@ -60,7 +63,7 @@
         </section>
       </template>
 
-      <!-- Casino & Aviator promo -->
+      <!-- ── Casino & Aviator promo ── -->
       <section class="grid sm:grid-cols-2 gap-4">
         <RouterLink to="/casino/aviator"
           class="relative overflow-hidden rounded-2xl p-6 block hover:opacity-90 transition-opacity"
@@ -83,7 +86,7 @@
         </RouterLink>
       </section>
 
-      <!-- Promotions -->
+      <!-- ── Promotions ── -->
       <section>
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-black text-cyan-100">🎁 Promotions</h2>
@@ -98,6 +101,7 @@
           </div>
         </div>
       </section>
+
     </div>
   </div>
 </template>
@@ -111,23 +115,60 @@ import { useMatchStore } from '../../stores/match/useMatchStore.js'
 
 const matchStore = useMatchStore()
 
+// Helper Function: Kubadilisha Muundo wa DB kwenda kwenye Muundo unaosomwa na MatchCard.vue
+// HomePage.vue - formatMatchForCard function
+
 const formatMatchForCard = (dbMatch) => {
   const odds1X2 = dbMatch.odds?.['1X2'] || {}
+
+  // Function ya kupata dakika halisi inayotakiwa kuonyeshwa
+  const getCurrentMinuteFromMatch = (match) => {
+    if (match.status !== 'LIVE') return null
+
+    // A. Kama backend/socket directly inaleta elapsed_minute
+    if (match.elapsed_minute !== undefined && match.elapsed_minute !== null) {
+      return `${match.elapsed_minute}'`
+    }
+
+    // B. Calculate kulingana na Clock Time tangu mechi ianze
+    if (match.date && match.time) {
+      const matchStart = new Date(`${match.date} ${match.time}`)
+      const now = new Date()
+      const elapsedMinutes = Math.floor((now - matchStart) / (1000 * 60))
+
+      if (!isNaN(elapsedMinutes) && elapsedMinutes >= 0) {
+        // Kama mechi imevuka dk 90 lakini bado backend haijafanya FINISHED
+        if (elapsedMinutes >= 90) return "90+'"
+        return `${elapsedMinutes}'`
+      }
+    }
+
+    return 'LIVE'
+  }
+
+  let displayTime = ''
+  if (dbMatch.status === 'LIVE') {
+    displayTime = getCurrentMinuteFromMatch(dbMatch)
+  } else {
+    const dateStr = formatDate(dbMatch.date)
+    const timeStr = formatTimeWithAMPM(dbMatch.time)
+    displayTime = dateStr ? `${timeStr} ${dateStr}` : timeStr
+  }
 
   return {
     id: dbMatch.id,
     league: dbMatch.league || 'General League',
-    time: dbMatch.time || '',
-    elapsed_minute: dbMatch.elapsed_minute, // Pass directly for reactive display
-    home_team: dbMatch.home_team,
-    away_team: dbMatch.away_team,
+    time: displayTime,
     homeTeam: dbMatch.home_team,
-    awayTeam: dbMatch.away_team,
     date: dbMatch.date || '',
+    awayTeam: dbMatch.away_team,
     live: dbMatch.status === 'LIVE',
     status: dbMatch.status,
-    current_score: dbMatch.current_score || { home: 0, away: 0 },
     predetermined_script: dbMatch.predetermined_script,
+    score: {
+      home: dbMatch.current_score?.home ?? 0,
+      away: dbMatch.current_score?.away ?? 0
+    },
     odds: [
       { key: '1', label: '1', value: odds1X2['1'] ?? 1.00 },
       { key: 'X', label: 'X', value: odds1X2['X'] ?? 1.00 },
@@ -135,10 +176,16 @@ const formatMatchForCard = (dbMatch) => {
     ]
   }
 }
+// Computed Properties za ku-map mechi za Store
+const formattedUpcomingMatches = computed(() => {
+  return matchStore.upcomingMatches.map(formatMatchForCard)
+})
 
-const formattedUpcomingMatches = computed(() => matchStore.upcomingMatches.map(formatMatchForCard))
-const formattedLiveMatches = computed(() => matchStore.liveMatches.map(formatMatchForCard))
+const formattedLiveMatches = computed(() => {
+  return matchStore.liveMatches.map(formatMatchForCard)
+})
 
+// Fetch Matches & Connect Socket Lifecycle Hooks
 onMounted(() => {
   matchStore.fetchAllMatches()
   matchStore.initMatchSocket()

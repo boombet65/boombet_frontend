@@ -165,24 +165,9 @@ export const useMatchStore = defineStore('match', {
     initMatchSocket() {
       if (this.socket) return
 
-      // Inatumia localhost ukiwa kwenye dev environment, na domain ya SSL ukiwa kwenye VPS
-      const socketUrl = window.location.origin.includes('localhost')
-        ? 'http://localhost:5000'
-        : window.location.origin
-
-      this.socket = io(socketUrl, {
-        path: '/socket.io/',
-        transports: ['websocket', 'polling'],
-        autoConnect: true,
-        secure: window.location.protocol === 'https:'
-      })
-
-      this.socket.on('connect', () => {
-        console.log('⚡ Socket connected successfully:', this.socket.id)
-      })
-
-      this.socket.on('connect_error', (err) => {
-        console.error('❌ Socket Connection Error:', err.message)
+      this.socket = io('http://localhost:5000', {
+        transports: ['websocket'],
+        autoConnect: true
       })
 
       // ✅ LISTENER KWA MATCH SCORE & MINUTE UPDATE

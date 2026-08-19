@@ -1,3 +1,4 @@
+// store/useMatchStore.js
 import { defineStore } from 'pinia'
 import { matchService } from '../../services/match/match.service'
 import { io } from 'socket.io-client'
@@ -51,6 +52,8 @@ export const useMatchStore = defineStore('match', {
     },
 
     // --- ADMIN ACTIONS ---
+
+    // 1. Kutengeneza Mechi Mpya (POST)
     async createMatch(matchData) {
       this.actionLoading = true
       this.error = null
@@ -58,12 +61,11 @@ export const useMatchStore = defineStore('match', {
         const response = await matchService.createMatch(matchData)
         const newMatch = response.data.data
 
+        // Kama mechi imeundwa ikiwa UPCOMING, iongeze kwenye upcomingMatches
         if (newMatch.status === 'UPCOMING') {
           this.upcomingMatches.unshift(newMatch)
-          this.upcomingMatches = [...this.upcomingMatches]
         } else if (newMatch.status === 'LIVE') {
           this.liveMatches.unshift(newMatch)
-          this.liveMatches = [...this.liveMatches]
         }
 
         return response.data
@@ -75,6 +77,7 @@ export const useMatchStore = defineStore('match', {
       }
     },
 
+    // --- CREATE BULK ---
     async createMultipleMatches(matchesData) {
       this.actionLoading = true
       this.error = null
@@ -90,9 +93,6 @@ export const useMatchStore = defineStore('match', {
           }
         })
 
-        this.upcomingMatches = [...this.upcomingMatches]
-        this.liveMatches = [...this.liveMatches]
-
         return response.data
       } catch (err) {
         this.error = err.response?.data?.message || 'Imeshindikana kuunda mechi nyingi'
@@ -102,6 +102,7 @@ export const useMatchStore = defineStore('match', {
       }
     },
 
+    // --- UPLOAD FILE ---
     async uploadMatchesFile(file) {
       this.actionLoading = true
       this.error = null
@@ -117,9 +118,6 @@ export const useMatchStore = defineStore('match', {
           }
         })
 
-        this.upcomingMatches = [...this.upcomingMatches]
-        this.liveMatches = [...this.liveMatches]
-
         return response.data
       } catch (err) {
         this.error = err.response?.data?.message || 'Imeshindikana kuupload file'
@@ -129,6 +127,7 @@ export const useMatchStore = defineStore('match', {
       }
     },
 
+    // 2. Kurekebisha Odds za Mechi (PATCH)
     async updateOdds(matchId, odds) {
       this.actionLoading = true
       this.error = null
@@ -136,6 +135,7 @@ export const useMatchStore = defineStore('match', {
         const response = await matchService.updateMatchOdds(matchId, odds)
         const updatedMatch = response.data.data
 
+        // Update kwenye state
         this._updateLocalMatch(updatedMatch)
         return response.data
       } catch (err) {
@@ -146,11 +146,14 @@ export const useMatchStore = defineStore('match', {
       }
     },
 
+    // 3. Kubadilisha Status ya Mechi (PATCH)
     async updateStatus(matchId, status) {
       this.actionLoading = true
       this.error = null
       try {
         const response = await matchService.updateMatchStatus(matchId, status)
+        
+        // Refresh list baada ya kubadilisha status
         await this.fetchAllMatches()
         return response.data
       } catch (err) {
@@ -165,103 +168,79 @@ export const useMatchStore = defineStore('match', {
     initMatchSocket() {
       if (this.socket) return
 
-      // Inatumia localhost ukiwa kwenye dev environment, na domain ya SSL ukiwa kwenye VPS
-      const socketUrl = window.location.origin.includes('localhost')
-        ? 'http://localhost:5000'
-        : window.location.origin
-
-      this.socket = io(socketUrl, {
-        path: '/socket.io/',
-        transports: ['websocket', 'polling'],
-        autoConnect: true,
-        secure: window.location.protocol === 'https:'
+      this.socket = io('http://localhost:5000', {
+        transports: ['websocket'],
+        autoConnect: true
       })
 
-      this.socket.on('connect', () => {
-        console.log('⚡ Socket connected successfully:', this.socket.id)
-      })
-
-      this.socket.on('connect_error', (err) => {
-        console.error('❌ Socket Connection Error:', err.message)
-      })
-
-      // ✅ LISTENER KWA MATCH SCORE & MINUTE UPDATE
+      // ✅ LISTENER KWA MATCH SCORE UPDATE
       this.socket.on('match_score_update', ({ match_id, current_score, elapsed_minute }) => {
-        console.log('⚡ Score/Minute Update:', match_id, current_score, elapsed_minute)
+        console.log('⚡ Score Update:', match_id, current_score)
         
-        // Match ID Comparison kwa kutumia String() kuzuia type mismatch
-        const liveIndex = this.liveMatches.findIndex(m => String(m.id) === String(match_id))
-        
-        if (liveIndex !== -1) {
-          const updatedMatch = {
-            ...this.liveMatches[liveIndex],
-            current_score: current_score ? { ...current_score } : this.liveMatches[liveIndex].current_score,
-            elapsed_minute: elapsed_minute !== undefined ? elapsed_minute : this.liveMatches[liveIndex].elapsed_minute,
-            _updatedAt: Date.now()
+        const liveMatch = this.liveMatches.find(m => m.id === match_id)
+        if (liveMatch) {
+          liveMatch.current_score = current_score
+          // Ikiwa backend inatuma elapsed_minute, ihifadhi
+          if (elapsed_minute !== undefined) {
+            liveMatch.elapsed_minute = elapsed_minute
           }
-          
-          this.liveMatches.splice(liveIndex, 1, updatedMatch)
-          this.liveMatches = [...this.liveMatches] // Force top-level reactivity
         } else {
-          const upcomingIndex = this.upcomingMatches.findIndex(m => String(m.id) === String(match_id))
+          const upcomingIndex = this.upcomingMatches.findIndex(m => m.id === match_id)
           if (upcomingIndex !== -1) {
-            const movedMatch = {
-              ...this.upcomingMatches[upcomingIndex],
-              status: 'LIVE',
-              current_score: current_score ? { ...current_score } : this.upcomingMatches[upcomingIndex].current_score,
-              elapsed_minute: elapsed_minute !== undefined ? elapsed_minute : this.upcomingMatches[upcomingIndex].elapsed_minute,
-              _updatedAt: Date.now()
+            const [movedMatch] = this.upcomingMatches.splice(upcomingIndex, 1)
+            movedMatch.status = 'LIVE'
+            movedMatch.current_score = current_score
+            if (elapsed_minute !== undefined) {
+              movedMatch.elapsed_minute = elapsed_minute
             }
-
-            this.upcomingMatches.splice(upcomingIndex, 1)
-            this.upcomingMatches = [...this.upcomingMatches]
-
             this.liveMatches.push(movedMatch)
-            this.liveMatches = [...this.liveMatches]
             console.log('🔄 Match moved to LIVE:', movedMatch.home_team, 'vs', movedMatch.away_team)
           }
         }
 
-        if (this.selectedMatch && String(this.selectedMatch.id) === String(match_id)) {
-          this.selectedMatch = {
-            ...this.selectedMatch,
-            status: 'LIVE',
-            current_score: current_score ? { ...current_score } : this.selectedMatch.current_score,
-            elapsed_minute: elapsed_minute !== undefined ? elapsed_minute : this.selectedMatch.elapsed_minute,
-            _updatedAt: Date.now()
+        if (this.selectedMatch && this.selectedMatch.id === match_id) {
+          this.selectedMatch.status = 'LIVE'
+          this.selectedMatch.current_score = current_score
+          if (elapsed_minute !== undefined) {
+            this.selectedMatch.elapsed_minute = elapsed_minute
           }
         }
       })
 
-      // ✅ LISTENER KWA MATCH EVENT UPDATE
+      // ✅ LISTENER KWA MATCH EVENT UPDATE (KUTOKA PREDETERMINED SCRIPT)
       this.socket.on('match_event_update', ({ match_id, event_index, current_event }) => {
         console.log('📅 Event Update:', match_id, 'Event Index:', event_index)
         
-        const liveIndex = this.liveMatches.findIndex(m => String(m.id) === String(match_id))
-        if (liveIndex !== -1) {
-          const liveMatch = { ...this.liveMatches[liveIndex] }
-          const events = liveMatch.predetermined_script?.events_timeline || []
+        const liveMatch = this.liveMatches.find(m => m.id === match_id)
+        if (liveMatch && liveMatch.predetermined_script?.events_timeline) {
+          const events = liveMatch.predetermined_script.events_timeline
           
+          // Kama event_index imetumwa, tumia hiyo
           if (event_index !== undefined && event_index < events.length) {
             const event = events[event_index]
-            if (event.current_score) liveMatch.current_score = { ...event.current_score }
-            if (event.minute !== undefined) liveMatch.elapsed_minute = event.minute
-            
+            // Update current_score ikiwa event ina current_score
+            if (event.current_score) {
+              liveMatch.current_score = event.current_score
+            }
+            // Update status ikiwa ni HALF_TIME au FULL_TIME
             if (event.type === 'HALF_TIME') {
               liveMatch.status = 'HALF_TIME'
             } else if (event.type === 'FULL_TIME') {
               liveMatch.status = 'FINISHED'
-              this.liveMatches = this.liveMatches.filter(m => String(m.id) !== String(match_id))
-              return
+              // Ongeza kwenye finished matches au remove from live
+              this.liveMatches = this.liveMatches.filter(m => m.id !== match_id)
             }
-          } else if (current_event) {
-            if (current_event.current_score) liveMatch.current_score = { ...current_event.current_score }
-            if (current_event.minute !== undefined) liveMatch.elapsed_minute = current_event.minute
+          } 
+          // Kama current_event imetumwa, tumia hiyo
+          else if (current_event && current_event.minute !== undefined) {
+            // Update current_score ikiwa ipo
+            if (current_event.current_score) {
+              liveMatch.current_score = current_event.current_score
+            }
           }
           
-          liveMatch._updatedAt = Date.now()
-          this.liveMatches.splice(liveIndex, 1, liveMatch)
-          this.liveMatches = [...this.liveMatches]
+          // Trigger reactivity update
+          liveMatch._updated = Date.now()
         }
       })
 
@@ -269,13 +248,13 @@ export const useMatchStore = defineStore('match', {
       this.socket.on('match_finished', ({ match_id, final_score }) => {
         console.log('🏁 Match Finished:', match_id, final_score)
         
-        this.liveMatches = this.liveMatches.filter(m => String(m.id) !== String(match_id))
+        this.liveMatches = this.liveMatches.filter(m => m.id !== match_id)
 
-        if (this.selectedMatch && String(this.selectedMatch.id) === String(match_id)) {
-          this.selectedMatch = {
-            ...this.selectedMatch,
-            status: 'FINISHED',
-            current_score: final_score ? { home: final_score.homeScore, away: final_score.awayScore } : this.selectedMatch.current_score
+        if (this.selectedMatch && this.selectedMatch.id === match_id) {
+          this.selectedMatch.status = 'FINISHED'
+          this.selectedMatch.current_score = { 
+            home: final_score.homeScore, 
+            away: final_score.awayScore 
           }
         }
       })
@@ -285,17 +264,19 @@ export const useMatchStore = defineStore('match', {
         console.log('🔄 Status Change:', match_id, status)
         
         if (status === 'LIVE') {
-          const upcomingIndex = this.upcomingMatches.findIndex(m => String(m.id) === String(match_id))
+          // Tafuta kwenye upcoming na uhamishe kwenye live
+          const upcomingIndex = this.upcomingMatches.findIndex(m => m.id === match_id)
           if (upcomingIndex !== -1) {
             const [movedMatch] = this.upcomingMatches.splice(upcomingIndex, 1)
-            this.upcomingMatches = [...this.upcomingMatches]
-
-            const liveMatch = { ...movedMatch, status: 'LIVE', ...(match_data || {}) }
-            this.liveMatches.push(liveMatch)
-            this.liveMatches = [...this.liveMatches]
+            movedMatch.status = 'LIVE'
+            if (match_data) {
+              Object.assign(movedMatch, match_data)
+            }
+            this.liveMatches.push(movedMatch)
           }
         } else if (status === 'FINISHED') {
-          this.liveMatches = this.liveMatches.filter(m => String(m.id) !== String(match_id))
+          // Ondoa kwenye live
+          this.liveMatches = this.liveMatches.filter(m => m.id !== match_id)
         }
       })
 
@@ -310,65 +291,64 @@ export const useMatchStore = defineStore('match', {
       }
     },
 
+    // ✅ HELPER KUPATA EVENT YA MWISHO KWA LIVE MATCH
     getCurrentEvent(matchId) {
-      const match = this.liveMatches.find(m => String(m.id) === String(matchId))
+      const match = this.liveMatches.find(m => m.id === matchId)
       if (!match?.predetermined_script?.events_timeline) return null
+      
       const events = match.predetermined_script.events_timeline
       return events[events.length - 1] || null
     },
 
+    // ✅ HELPER KUPATA DAKIKA YA SASA KWA LIVE MATCH
     getCurrentMinute(matchId) {
-      const match = this.liveMatches.find(m => String(m.id) === String(matchId))
-      if (match?.elapsed_minute !== undefined) return match.elapsed_minute
+      const match = this.liveMatches.find(m => m.id === matchId)
       if (!match?.predetermined_script?.events_timeline) return null
+      
       const events = match.predetermined_script.events_timeline
       const lastEvent = events[events.length - 1]
       return lastEvent?.minute || null
     },
 
+    // ✅ HELPER KUSASISHA EVENT KWA MATCH (INAWEZA KUITWA KUTOKA ADMIN)
     advanceMatchEvent(matchId, eventIndex) {
-      const liveIndex = this.liveMatches.findIndex(m => String(m.id) === String(matchId))
-      if (liveIndex === -1) return false
+      const match = this.liveMatches.find(m => m.id === matchId)
+      if (!match?.predetermined_script?.events_timeline) return false
       
-      const match = { ...this.liveMatches[liveIndex] }
-      const events = match.predetermined_script?.events_timeline || []
-      
+      const events = match.predetermined_script.events_timeline
       if (eventIndex >= 0 && eventIndex < events.length) {
         const event = events[eventIndex]
-        if (event.current_score) match.current_score = { ...event.current_score }
-        if (event.minute !== undefined) match.elapsed_minute = event.minute
         
+        // Update score ikiwa event ina current_score
+        if (event.current_score) {
+          match.current_score = event.current_score
+        }
+        
+        // Update status ikiwa ni HALF_TIME au FULL_TIME
         if (event.type === 'HALF_TIME') {
           match.status = 'HALF_TIME'
         } else if (event.type === 'FULL_TIME') {
           match.status = 'FINISHED'
-          this.liveMatches = this.liveMatches.filter(m => String(m.id) !== String(matchId))
-          return true
+          this.liveMatches = this.liveMatches.filter(m => m.id !== matchId)
         }
         
-        match._updatedAt = Date.now()
-        this.liveMatches.splice(liveIndex, 1, match)
-        this.liveMatches = [...this.liveMatches]
+        // Trigger reactivity
+        match._updated = Date.now()
         return true
       }
       return false
     },
 
+    // Helper ya ku-update mechi kwenye local array
     _updateLocalMatch(updatedMatch) {
-      let matchIndex = this.upcomingMatches.findIndex(m => String(m.id) === String(updatedMatch.id))
-      if (matchIndex !== -1) {
-        this.upcomingMatches[matchIndex] = { ...this.upcomingMatches[matchIndex], ...updatedMatch }
-        this.upcomingMatches = [...this.upcomingMatches]
-      } else {
-        matchIndex = this.liveMatches.findIndex(m => String(m.id) === String(updatedMatch.id))
-        if (matchIndex !== -1) {
-          this.liveMatches[matchIndex] = { ...this.liveMatches[matchIndex], ...updatedMatch }
-          this.liveMatches = [...this.liveMatches]
-        }
+      let match = this.upcomingMatches.find(m => m.id === updatedMatch.id)
+      if (!match) match = this.liveMatches.find(m => m.id === updatedMatch.id)
+      
+      if (match) {
+        Object.assign(match, updatedMatch)
       }
-
-      if (this.selectedMatch && String(this.selectedMatch.id) === String(updatedMatch.id)) {
-        this.selectedMatch = { ...this.selectedMatch, ...updatedMatch }
+      if (this.selectedMatch && this.selectedMatch.id === updatedMatch.id) {
+        Object.assign(this.selectedMatch, updatedMatch)
       }
     }
   }

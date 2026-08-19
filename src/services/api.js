@@ -7,7 +7,7 @@ import axios from 'axios'
 // https://boombet365.com/api
 // Create axios instance
 const api = axios.create({
-  baseURL: 'https://boombet365.com/api',
+  baseURL: 'http://localhost:5000/api',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',   

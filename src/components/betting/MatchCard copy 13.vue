@@ -10,10 +10,10 @@
           </span>
         </div>
         <div class="flex items-center gap-2">
-          <!-- ONYESHA DAKIKA REAL-TIME AU TAREHE/SASA KWA UPCOMING -->
+          <!-- ONYESHA DAKIKA REAL-TIME -->
           <span 
             class="text-[12px] font-bold" 
-            :class="isLive ? 'text-red-400 animate-pulse' : 'text-cyan-400'"
+            :class="isLive ? 'text-red-400 animate-pulse' : 'text-cyan-500'"
           >
             {{ displayTime }}
           </span>
@@ -68,58 +68,7 @@ const awayTeamName = computed(() => props.match?.away_team || props.match?.awayT
 const isLive = computed(() => props.match?.status === 'LIVE' || props.match?.live || false)
 const currentScore = computed(() => props.match?.current_score || props.match?.score || { home: 0, away: 0 })
 
-// HELPER FUNCTION KWA AJILI YA UPCOMING MATCH FORMATTING
-function formatUpcomingTime(dateStr, timeStr) {
-  if (!dateStr && !timeStr) return props.match?.time || ''
-
-  try {
-    let matchDateObj
-
-    // Kama tuna date na time tofauti au iliyoungana
-    if (dateStr && timeStr) {
-      matchDateObj = new Date(`${dateStr}T${timeStr}`)
-      if (isNaN(matchDateObj.getTime())) {
-        matchDateObj = new Date(`${dateStr} ${timeStr}`)
-      }
-    } else if (dateStr) {
-      matchDateObj = new Date(dateStr)
-    } else {
-      return timeStr
-    }
-
-    if (isNaN(matchDateObj.getTime())) {
-      return timeStr || dateStr
-    }
-
-    const today = new Date()
-    const isToday =
-      matchDateObj.getDate() === today.getDate() &&
-      matchDateObj.getMonth() === today.getMonth() &&
-      matchDateObj.getFullYear() === today.getFullYear()
-
-    // Forma ya Mfumo wa Saa: "8:00 PM"
-    const timeFormatted = matchDateObj.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    })
-
-    if (isToday) {
-      return `${timeFormatted} Today`
-    } else {
-      // Forma ya Siku na Tarehe: "Thu 20/08"
-      const dayName = matchDateObj.toLocaleDateString('en-US', { weekday: 'short' })
-      const dayNum = String(matchDateObj.getDate()).padStart(2, '0')
-      const monthNum = String(matchDateObj.getMonth() + 1).padStart(2, '0')
-
-      return `${timeFormatted} ${dayName} ${dayNum}/${monthNum}`
-    }
-  } catch (err) {
-    return timeStr || dateStr || ''
-  }
-}
-
-// REALTIME COMPUTED DAKIKA & DATE/TIME UPDATE
+// REALTIME COMPUTED DAKIKA UPDATE (Ina-update hapo hapo socket inapochorwa kwenye store)
 const displayTime = computed(() => {
   if (!props.match) return ''
 
@@ -149,8 +98,7 @@ const displayTime = computed(() => {
     return 'LIVE'
   }
 
-  // UPCOMING MATCH DISPLAY FORMAT:
-  return formatUpcomingTime(props.match.date || props.match.match_date, props.match.time || props.match.match_time)
+  return props.match.time || ''
 })
 
 const formatted1X2Odds = computed(() => {
